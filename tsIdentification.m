@@ -13,8 +13,8 @@ function tsIdentification(isLoad)
     if isLoad == 1
         load data/motor_link.mat dataset
     else
-        x0Grid = [0 -2*pi; 0.2 pi];
-        dataset = collectData(rhs, x0Grid, T, learnStep, m, n);
+        x0Grid = uniformGrid([-pi/2 pi/2; -2*pi 2*pi], 4);
+        dataset = collectData(rhs, x0Grid, T, learnStep, m);
         dataName = 'data/motor_link';
         save(dataName, 'dataset')
     end
@@ -54,9 +54,22 @@ function dXdt = rhsMotorLink(x, u)
     dXdt(2) = -64*sin(x(1)) - 5*x(2) + 400*u;
 end
 
-function dataset = collectData(rhs, x0Grid, T, learnStep, m, n)
+function x0Grid = uniformGrid(ranges, nPoints)
+% create grid of initial points from uniform distribution 
+% ranges(i, :) -- range of i-th component
+% nDivisions -- the number of segments into which the range is divided
+    [n, ~] = size(ranges);  % n -- length(state vector)
+    x0Grid = zeros(nPoints, n);
+    for iComponent=1:n
+        scale = ranges(iComponent, 2) - ranges(iComponent, 1);
+        bias = ranges(iComponent, 1);
+        x0Grid(:, iComponent) = scale * rand(nPoints, 1) + bias;
+    end
+end
+
+function dataset = collectData(rhs, x0Grid, T, learnStep, m)
 % create simulated data for TS model identification
-    [nPoints, ~] = size(x0Grid);
+    [nPoints, n] = size(x0Grid);
     timesteps = 0:learnStep:T;
     nSteps = length(timesteps);
     dataset = zeros(nPoints * (nSteps-1), m + 2*n);
@@ -152,8 +165,3 @@ function plotIdentified(tsModel, rhs, method, T, learnStep)
 %     legend('true', 'identified')
 %     title(method)
 end
-
-
-
-
-

@@ -34,10 +34,10 @@ function u = tsBasedControl(x, tsModel, learnStep)
     hatA = 1/learnStep * (waveA - eye(n));
     hatB = 1/learnStep * waveB;
     % 2.1 compare with ground truth
-    f = [x(2); -64*sin(x(1)) - 5*x(2)]
-    hatA * x
-    hatB
-    B = [0; 400]
+%     f = [x(2); -64*sin(x(1)) - 5*x(2)]
+%     hatA * x
+%     hatB
+%     B = [0; 400]
 
 
     % 3. Calculate u = SDRE(hatA, hatB)

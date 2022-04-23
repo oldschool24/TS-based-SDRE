@@ -12,7 +12,8 @@ function mainSim(sysRhs, learnStep, T, tsModel)
     [~, X_true] = ode45(@(t, x) sysRhs(x, u(x)), timesteps, x0);
     
     figure()
-    plot(X_true')
+    plot(timesteps, X_true)
+    legend('x1', 'x2')
 end
 
 function dXdt = rhsMotorLink(x, u)
