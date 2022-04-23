@@ -1,29 +1,21 @@
-function tsIdentification(isLoad, mode)
+function tsIdentification(isLoad)
 % identification of TS fuzzy model based on IO data
+% x(k+1) ~ f(x(k), u(k)); 
 % isLoad: 1, if load dataset; 0 if create
-% mode: 'current' x(k+1) ~ f(x(k), u(k)); 
-%       'current_previous' x(k+1) ~ f(x(k), x(k-1), u(k))
 
     T = 1;
     learnStep = 0.01;
 
-    if nargin == 1
-        mode = 'current';     
-    end
     rhs = @rhsMotorLink;
     m = 1;      % u = [u_1 ... u_m]';
     n = 2;      % x = [x_1 ... x_n]';
-    x0 = [0; -2*pi];
     method = 'SubtractiveClustering';
     if isLoad == 1
-        if strcmp(mode, 'current')
-            load data/motor_data_current.mat dataset
-        else
-            load data/motor_data_current_previous.mat dataset
-        end
+        load data/motor_link.mat dataset
     else
-        dataset = collectData(rhs, x0, mode, T, learnStep, m, n);
-        dataName = ['data/motor_data_' mode];
+        x0Grid = [0 -2*pi; 0.2 pi];
+        dataset = collectData(rhs, x0Grid, T, learnStep, m, n);
+        dataName = 'data/motor_link';
         save(dataName, 'dataset')
     end
 
@@ -40,7 +32,8 @@ function tsIdentification(isLoad, mode)
     % Note: u(k) is not included in if-condition
     tsModel = addInput(tsModel, [-0.5 0.5], 'Name', 'u(t)');
     % consequent: coefficients for u are zero -> u doesn't affect output  
-%     plotIdentified(tsModel, rhs, method, mode, 20, learnStep)
+%     plotIdentified(tsModel, rhs, method, 20, learnStep)
+
     thenParams = bls(tsModel, dataset, m, n);
     thenParams = addBiasNules(thenParams, nRules, n, m);
     thenParams = reshape(thenParams, 1, []);
@@ -48,13 +41,10 @@ function tsIdentification(isLoad, mode)
     tsModel = setTunableValues(tsModel, out, thenParams);
 
     % 3. plot and compare
-    plotIdentified(tsModel, rhs, method, mode, 20, learnStep)
+    plotIdentified(tsModel, rhs, method, 20, learnStep)
 
     % 4. save
-    writeFIS(tsModel, ['models/motor_link_ts_' mode])
-
-    % 5. control
-    u = tsBasedControl(tsModel, [0; 0], learnStep);
+    writeFIS(tsModel, 'models/motor_link')
 end
 
 function dXdt = rhsMotorLink(x, u)
@@ -64,34 +54,28 @@ function dXdt = rhsMotorLink(x, u)
     dXdt(2) = -64*sin(x(1)) - 5*x(2) + 400*u;
 end
 
-function dataset = collectData(rhs, x0, mode, T, learnStep, m, n)
+function dataset = collectData(rhs, x0Grid, T, learnStep, m, n)
 % create simulated data for TS model identification
-    global uList
-    uList = [];
+    [nPoints, ~] = size(x0Grid);
     timesteps = 0:learnStep:T;
-    [~, X] = ode45(@(t, x) rhs(x, uRand()), timesteps, x0);
-    plot(X(:, 1))
-    
     nSteps = length(timesteps);
-    if strcmp(mode, 'current')  % x(k+1) ~ f(x(k))
-        dataset = zeros(nSteps - 1, m + 2*n);
-        for k=1:nSteps-1
-            dataset(k, 1:n) = X(k, :);            
-            dataset(k, n+1:n+m) = uList(k, :);
-            dataset(k, m+n+1:end) = X(k+1, :);
-%             % uncomment in case when you want predict only x1
-%             dataset(k, 1:n) = X(k, 1);
-%             dataset(k, n+1:n+m) = uList(k, :);
-%             dataset(k, m+n+1:end) = X(k+1, 1);
+    dataset = zeros(nPoints * (nSteps-1), m + 2*n);
+    for iPoint=1:nPoints
+        % 1. Simulate with x0 = x0Grid(iPoint, :)'
+        uList = rand(nSteps, m) - 0.5;
+        pp = spline(timesteps, uList); % future: problems with m > 1
+        uRand = @(t) ppval(pp, t);  % random uniform control on [-0.5, 0.5]
+        [~, X] = ode45(@(t, x) rhs(x, uRand(t)), timesteps, x0Grid(iPoint, :)');
+        plot(X(:, 1)) % future: comment
+        
+        % 2. Save data from simulation
+        iData = (iPoint-1) * (nSteps-1);
+        for iStep=1:nSteps-1
+            dataset(iData+iStep, 1:n) = X(iStep, :);            
+            dataset(iData+iStep, n+1:n+m) = uList(iStep, :);
+            dataset(iData+iStep, m+n+1:end) = X(iStep+1, :);
         end
     end
-end
-
-function u = uRand()
-% random uniform control on [-0.5, 0.5]
-    u = rand() - 0.5;
-    global uList
-    uList(end+1, :) = u;       % ? problems with indexing
 end
 
 function thenParams = bls(tsModel, dataset, m, n)
@@ -139,7 +123,7 @@ function res = removeBiasNules(extParams, nRules, n, m)
     res = extParams;
 end
 
-function plotIdentified(tsModel, rhs, method, mode, T, learnStep)
+function plotIdentified(tsModel, rhs, method, T, learnStep)
     timesteps = 0:learnStep:T;
     uTest = @(t) 0.02*sin(0.1*pi*t) + 0.15*sin(pi*t) + ...
                  0.2*sin(10*pi*t) + 0.2*sin(100*pi*t);
@@ -147,21 +131,11 @@ function plotIdentified(tsModel, rhs, method, mode, T, learnStep)
     
     [~, n] = size(X_true);
     X_pred = zeros(length(timesteps), n);     % X_pred(1:2) = x0(1);
-    if strcmp(mode, 'current')
-        for k=2:length(timesteps)
-            X_pred(k, :) = evalfis(tsModel, [X_true(k-1, :)'; ...
-                                             uTest(timesteps(k-1))]);
-%             % uncomment in case when you want predict only x1
-%             X_pred(k, :) = evalfis(tsModel, [X_true(k-1, 1)'; ...
-%                                               uTest(timesteps(k-1))]);
-        end
-    else
-        for k=3:length(timesteps)
-            X_pred(k, :) = evalfis(tsModel, [X_true(k-1, :)'; ...
-                                             X_true(k-2, :)'; ...
-                                             uTest(timesteps(k-1))]);
-        end
+    for k=2:length(timesteps)
+        X_pred(k, :) = evalfis(tsModel, ...
+                               [X_true(k-1, :)'; uTest(timesteps(k-1))]);
     end
+
     figure()
     title(method)
     nLines = ceil(n/2);

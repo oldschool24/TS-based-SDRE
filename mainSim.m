@@ -3,7 +3,7 @@ function mainSim(sysRhs, learnStep, T, tsModel)
         sysRhs = @rhsMotorLink;
         learnStep = 0.01;
         T = 20;
-        tsModel = readfis('models/motor_link_ts_current.fis'); 
+        tsModel = readfis('models/motor_link.fis'); 
     end
 
     u = @(x) tsBasedControl(x, tsModel, learnStep);
