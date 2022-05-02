@@ -1,21 +1,36 @@
-function tsIdentification(isLoad)
+function tsIdentification(isLoad, sysName)
 % identification of TS fuzzy model based on IO data
 % x(k+1) ~ f(x(k), u(k)); 
 % isLoad: 1, if load dataset; 0 if create
 
+    if nargin == 1
+        sysName = 'motor_link';
+    end
+    % u = [u_1 ... u_m]', x = [x_1 ... x_n]'
+    if strcmp(sysName, 'motor_link')
+        rhs = @sys.rhsMotorLink;
+        m = 1;      
+        n = 2;
+    else
+        rhs = @sys.rhsInvPend;
+        m = 1;
+        n = 4;
+    end
+    
     T = 1;
     learnStep = 0.01;
-
-    rhs = @rhsMotorLink;
-    m = 1;      % u = [u_1 ... u_m]';
-    n = 2;      % x = [x_1 ... x_n]';
     method = 'SubtractiveClustering';
+    dataName = ['data/' sysName];
     if isLoad == 1
-        load data/motor_link.mat dataset
+        load(dataName, 'dataset')
     else
-        x0Grid = uniformGrid([-pi/2 pi/2; -2*pi 2*pi], 4);
+        if strcmp(sysName, 'motor_link')
+            x0Ranges = [-pi/2 pi/2; -2*pi 2*pi];
+        else
+            x0Ranges = [-0.1 0.1; 0 2*pi; -1 1; -pi pi];
+        end
+        x0Grid = uniformGrid(x0Ranges, 4);
         dataset = collectData(rhs, x0Grid, T, learnStep, m);
-        dataName = 'data/motor_link';
         save(dataName, 'dataset')
     end
 
@@ -44,14 +59,8 @@ function tsIdentification(isLoad)
     plotIdentified(tsModel, rhs, method, 20, learnStep)
 
     % 4. save
-    writeFIS(tsModel, 'models/motor_link')
-end
-
-function dXdt = rhsMotorLink(x, u)
-% right hand size of motor link system
-    dXdt = zeros(2, 1);
-    dXdt(1) = x(2);
-    dXdt(2) = -64*sin(x(1)) - 5*x(2) + 400*u;
+    modelName = ['models/' sysName];
+    writeFIS(tsModel, modelName)
 end
 
 function x0Grid = uniformGrid(ranges, nPoints)
@@ -79,9 +88,16 @@ function dataset = collectData(rhs, x0Grid, T, learnStep, m)
         pp = spline(timesteps, uList); % future: problems with m > 1
         uRand = @(t) ppval(pp, t);  % random uniform control on [-0.5, 0.5]
         [~, X] = ode45(@(t, x) rhs(x, uRand(t)), timesteps, x0Grid(iPoint, :)');
-        plot(X(:, 1)) % future: comment
         
-        % 2. Save data from simulation
+        % 2. Plot
+%         hold on
+%         for k=1:n         % future: comment
+%             plot(X(:, k)) 
+%         end
+%         legend('x', 'theta', 'x_dot', 'theta_dot')
+%         hold off
+
+        % 3. Save data from simulation
         iData = (iPoint-1) * (nSteps-1);
         for iStep=1:nSteps-1
             dataset(iData+iStep, 1:n) = X(iStep, :);            
@@ -138,8 +154,13 @@ end
 
 function plotIdentified(tsModel, rhs, method, T, learnStep)
     timesteps = 0:learnStep:T;
-    uTest = @(t) 0.02*sin(0.1*pi*t) + 0.15*sin(pi*t) + ...
-                 0.2*sin(10*pi*t) + 0.2*sin(100*pi*t);
+%     uTest = @(t) 0.02*sin(0.1*pi*t) + 0.15*sin(pi*t) + ...
+%                  0.2*sin(10*pi*t) + 0.2*sin(100*pi*t);
+%     uTest = @(t) 0.5;
+%     uTest = @(t) -0.5;
+%     uTest = @(t) 0.2 * sin(t);
+%     uTest = @(t) -0.2 * sin(t);
+%     uTest = @(t) 0.01 * t;
     [~, X_true] = ode45(@(t, x) rhs(x, uTest(t)), timesteps, [0; 0]);
     
     [~, n] = size(X_true);
