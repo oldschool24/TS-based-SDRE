@@ -50,7 +50,7 @@ function tsIdentification(isLoad, sysName)
 %     plotIdentified(tsModel, rhs, method, 20, learnStep)
 
     thenParams = bls(tsModel, dataset, m, n);
-    thenParams = addBiasNules(thenParams, nRules, n, m);
+    thenParams = utils.addBiasNules(thenParams, nRules, n, m);
     thenParams = reshape(thenParams, 1, []);
     [~, out] = getTunableSettings(tsModel);
     tsModel = setTunableValues(tsModel, out, thenParams);
@@ -133,29 +133,10 @@ function thenParams = bls(tsModel, dataset, m, n)
     thenParams = Phi \ X;
 end
 
-function extParams = addBiasNules(thenParams, nRules, n, m)
-% Set bias parameters of tsModel as null.
-    extParams = zeros(nRules * (n+m+1), n);
-    firstLine = 1;
-    for iRule=1:nRules
-        extLines = firstLine : firstLine+(n+m-1);
-        thenLines = 1+(iRule-1)*(n+m) : iRule*(n+m);
-        extParams(extLines, :) = thenParams(thenLines, :);
-        firstLine = firstLine + (n+m+1);
-    end
-end
-
-function res = removeBiasNules(extParams, nRules, n, m)
-% Remove bias parameters of tsModel
-    linesToRemove = (n+m+1) : (n+m+1) : nRules*(n+m+1);
-    extParams(linesToRemove, :) = [];
-    res = extParams;
-end
-
 function plotIdentified(tsModel, rhs, method, T, learnStep)
     timesteps = 0:learnStep:T;
-%     uTest = @(t) 0.02*sin(0.1*pi*t) + 0.15*sin(pi*t) + ...
-%                  0.2*sin(10*pi*t) + 0.2*sin(100*pi*t);
+    uTest = @(t) 0.02*sin(0.1*pi*t) + 0.15*sin(pi*t) + ...
+                 0.2*sin(10*pi*t) + 0.2*sin(100*pi*t);
 %     uTest = @(t) 0.5;
 %     uTest = @(t) -0.5;
 %     uTest = @(t) 0.2 * sin(t);

@@ -18,7 +18,7 @@ function u = tsBasedControl(x, tsModel, learnStep)
     thenParams = getTunableValues(tsModel, out);
     % column <-> component of state vector:
     thenParams = reshape(thenParams, [], n);
-    thenParams = removeBiasNules(thenParams, nRules, n, m);
+    thenParams = utils.removeBiasNules(thenParams, nRules, n, m);
 %     theta = zeros(nRules, n, n+m);
 %     % theta = reshaped thenParams: rule <-> matrix of parameters
     for iRule=1:nRules
@@ -34,10 +34,11 @@ function u = tsBasedControl(x, tsModel, learnStep)
     hatA = 1/learnStep * (waveA - eye(n));
     hatB = 1/learnStep * waveB;
     % 2.1 compare with ground truth
-%     f = [x(2); -64*sin(x(1)) - 5*x(2)]
-%     hatA * x
-%     hatB
-%     B = [0; 400]
+    global fTrue fPred Btrue Bpred
+    fTrue(end+1, :) = [x(2), -64*sin(x(1)) - 5*x(2)];
+    fPred(end+1, :) = hatA * x;
+    Btrue(end+1, :) = [0, 400];
+    Bpred(end+1, :) = hatB';
 
 
     % 3. Calculate u = SDRE(hatA, hatB)
@@ -45,11 +46,4 @@ function u = tsBasedControl(x, tsModel, learnStep)
     R = 5;
     P = icare(hatA, hatB, Q, R);
     u = -inv(R) * hatB' * P * x;
-end
-
-function res = removeBiasNules(extParams, nRules, n, m)
-% Remove bias parameters of tsModel
-    linesToRemove = (n+m+1) : (n+m+1) : nRules*(n+m+1);
-    extParams(linesToRemove, :) = [];
-    res = extParams;
 end
