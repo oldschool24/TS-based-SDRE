@@ -29,7 +29,7 @@ function tsIdentification(isLoad, sysName)
         else
             x0Ranges = [-0.1 0.1; 0 2*pi; -1 1; -pi pi];
         end
-        x0Grid = uniformGrid(x0Ranges, 4);
+        x0Grid = uniformGrid(x0Ranges, 100);
         dataset = collectData(rhs, x0Grid, T, learnStep, m);
         save(dataName, 'dataset')
     end
@@ -56,7 +56,7 @@ function tsIdentification(isLoad, sysName)
     tsModel = setTunableValues(tsModel, out, thenParams);
 
     % 3. plot and compare
-    plotIdentified(tsModel, rhs, method, 20, learnStep)
+    plotIdentified(tsModel, rhs, method, 20, learnStep, [0; 0])
 
     % 4. save
     modelName = ['models/' sysName];
@@ -133,37 +133,53 @@ function thenParams = bls(tsModel, dataset, m, n)
     thenParams = Phi \ X;
 end
 
-function plotIdentified(tsModel, rhs, method, T, learnStep)
+function plotIdentified(tsModel, rhs, method, T, learnStep, x0)
     timesteps = 0:learnStep:T;
-    uTest = @(t) 0.02*sin(0.1*pi*t) + 0.15*sin(pi*t) + ...
-                 0.2*sin(10*pi*t) + 0.2*sin(100*pi*t);
-%     uTest = @(t) 0.5;
-%     uTest = @(t) -0.5;
-%     uTest = @(t) 0.2 * sin(t);
-%     uTest = @(t) -0.2 * sin(t);
-%     uTest = @(t) 0.01 * t;
-    [~, X_true] = ode45(@(t, x) rhs(x, uTest(t)), timesteps, [0; 0]);
-    
-    [~, n] = size(X_true);
-    X_pred = zeros(length(timesteps), n);     % X_pred(1:2) = x0(1);
-    for k=2:length(timesteps)
-        X_pred(k, :) = evalfis(tsModel, ...
-                               [X_true(k-1, :)'; uTest(timesteps(k-1))]);
+    nSteps = length(timesteps);
+    n = length(x0);
+    freq = [50, 5, 0.5, 0.05];
+    delay = zeros(size(freq));
+    uniformInterval = [-0.2 0.2; -0.2 0.2; 0.1 0.15; -0.02 0.02];
+    uTest = testFunctions(T, freq, delay, uniformInterval);
+    nTests = length(uTest);
+    X_true = zeros(nTests, nSteps, n);
+    for iTest=1:nTests
+        % use spline approximation of random control
+        uList = arrayfun(uTest{iTest}, timesteps);
+        pp = spline(timesteps, uList); % future: problems with m > 1
+        u = @(t) ppval(pp, t);  
+        % collect true answers
+        [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
+        X_true(iTest, :, :) = X;
     end
+    [~, ~, n] = size(X_true);
+    
+    X_pred = zeros(nTests, nSteps-1, n);     % X_pred(1:2) = x0(1);
+    X = zeros(nSteps, n);
+    warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
+    warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+    for iTest=1:nTests
+        u = uTest{iTest};
+        X(:, :) = X_true(iTest, :, :);
+        for iStep=2:nSteps
+            X_pred(iTest, iStep, :) = evalfis(tsModel, ...
+                                              [X(iStep-1, :)'; ...
+                                              u(timesteps(iStep-1))]);
+        end
+    end
+    warning('on', 'fuzzy:general:warnEvalfis_NoRuleFired')
+    warning('on', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
 
-    figure()
-    title(method)
     nLines = ceil(n/2);
     nColumns = 2;
-    for k=1:n
-        subplot(nLines, nColumns, k)
-        plot(timesteps, X_true(:, k), timesteps, X_pred(:, k))
-        legend('true', 'identified')
-        title(['x_' num2str(k)])
+    for iTest=1:nTests
+        figure()
+        title(method)
+        for k=1:n
+            subplot(nLines, nColumns, k)
+            plot(timesteps, X_true(iTest, :, k), timesteps, X_pred(iTest, :, k))
+            legend('true', 'identified')
+            title(['x_' num2str(k)])
+        end
     end
-%     % uncomment in case when you want predict only x1
-%     figure()
-%     plot(timesteps, X_true(:, 1), timesteps, X_pred(:, 1))
-%     legend('true', 'identified')
-%     title(method)
 end
