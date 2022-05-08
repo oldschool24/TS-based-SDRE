@@ -8,10 +8,18 @@ function mainSim(sysRhs, learnStep, T, tsModel)
 
     u = @(x) tsBasedControl(x, tsModel, learnStep);
     timesteps = 0:learnStep:T;
-    x0 = [-0.4; 2];  % change it sometime
+    x0 = [-pi/2; -3*pi];  % change it sometime
     global fTrue fPred Btrue Bpred
     [~, X_true] = ode45(@(t, x) sysRhs(x, u(x)), timesteps, x0);
     
+    nSteps = length(timesteps);
+    m = length(u(X_true(1, :)'));
+    uList = zeros(nSteps, m);
+    for iStep=1:nSteps
+        uList(nSteps, :) = u(X_true(1, :)');
+    end
+    plot(timesteps, uList)
+
     figure()
     plot(timesteps, X_true)
     legend('x1', 'x2')
