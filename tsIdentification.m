@@ -29,7 +29,7 @@ function tsIdentification(isLoad, sysName)
         else
             x0Ranges = [-0.1 0.1; 0 2*pi; -1 1; -pi pi];
         end
-        x0Grid = uniformGrid(x0Ranges, 100);
+        x0Grid = uniformGrid(x0Ranges, 4);
         dataset = collectData(rhs, x0Grid, T, learnStep, m);
         save(dataName, 'dataset')
     end
@@ -54,6 +54,16 @@ function tsIdentification(isLoad, sysName)
     thenParams = reshape(thenParams, 1, []);
     [~, out] = getTunableSettings(tsModel);
     tsModel = setTunableValues(tsModel, out, thenParams);
+    
+    % 3. Calculate the RMSE
+    [nData, ~] = size(dataset); 
+    RMSE = 0;
+    for iData=1:nData
+        pred = evalfis(tsModel, dataset(iData, 1:n+m));
+        RMSE = RMSE + norm(dataset(iData, n+m+1:end) - pred) ^ 2;
+    end
+    RMSE = sqrt(RMSE / nData);
+    disp(['RMSE = ', num2str(RMSE)])
 
     % 3. plot and compare
     plotIdentified(tsModel, rhs, method, 20, learnStep, [0; 0])
@@ -81,29 +91,51 @@ function dataset = collectData(rhs, x0Grid, T, learnStep, m)
     [nPoints, n] = size(x0Grid);
     timesteps = 0:learnStep:T;
     nSteps = length(timesteps);
-    dataset = zeros(nPoints * (nSteps-1), m + 2*n);
+    uTrain = trainFuncs([-0.5 0.5], -2);
+    nControls = length(uTrain);
+    dataset = zeros(nPoints * nControls * (nSteps-1), m + 2*n);
+    iData = 0;
     for iPoint=1:nPoints
-        % 1. Simulate with x0 = x0Grid(iPoint, :)'
-        uList = rand(nSteps, m) - 0.5;
-        pp = spline(timesteps, uList); % future: problems with m > 1
-        uRand = @(t) ppval(pp, t);  % random uniform control on [-0.5, 0.5]
-        [~, X] = ode45(@(t, x) rhs(x, uRand(t)), timesteps, x0Grid(iPoint, :)');
-        
-        % 2. Plot
-%         hold on
-%         for k=1:n         % future: comment
-%             plot(X(:, k)) 
-%         end
-%         legend('x', 'theta', 'x_dot', 'theta_dot')
-%         hold off
+        x0 = x0Grid(iPoint, :)';
+        for iControl=1:nControls
+            % 1. Integrate with initial condition = x0
+            uList = arrayfun(uTrain{iControl}, timesteps)';
+            pp = spline(timesteps, uList);  % future: problems with m > 1
+            u = @(t) ppval(pp, t);
+            [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
 
-        % 3. Save data from simulation
-        iData = (iPoint-1) * (nSteps-1);
-        for iStep=1:nSteps-1
-            dataset(iData+iStep, 1:n) = X(iStep, :);            
-            dataset(iData+iStep, n+1:n+m) = uList(iStep, :);
-            dataset(iData+iStep, m+n+1:end) = X(iStep+1, :);
+%             % 2. Plot
+%             figure()
+%             hold on
+%             for k=1:n         % future: comment
+%                 plot(X(:, k)) 
+%             end
+% %             legend('x', 'theta', 'x_dot', 'theta_dot')
+%             hold off
+
+            % 3. Save data from simulation
+            for iStep=1:nSteps-1
+                dataset(iData+iStep, 1:n) = X(iStep, :);            
+                dataset(iData+iStep, n+1:n+m) = uList(iStep, :);
+                dataset(iData+iStep, m+n+1:end) = X(iStep+1, :);
+            end
+            iData = iData + (nSteps-1);
         end
+    end
+end
+
+function res = trainFuncs(uniformInterval, expAlpha)
+    amp = (uniformInterval(:, 2) - uniformInterval(:, 1)) / 2;
+    offset = (uniformInterval(:, 1) + uniformInterval(:, 2)) / 2;
+    [nFuncs, ~] = size(uniformInterval);
+    nExp = length(expAlpha);
+    res = cell(nFuncs + nExp, 1);
+    for iFunc=1:nFuncs
+        res{iFunc} = @(t) amp(iFunc)*rand() + offset(iFunc);
+    end
+    for iExp=1:length(expAlpha)
+        amp = uniformInterval(randi(nFuncs), 2);
+        res{nFuncs + iExp} = @(t) amp * exp(expAlpha(iExp) * t);
     end
 end
 
