@@ -1,12 +1,16 @@
-function res = testFunctions(T, freq, delay, uniformInterval)
+function res = testFunctions(sysName)
     res = {};
-    % here can be problem with ranges like [0.2, 1]
-    if nargin == 0
+    if strcmp(sysName, 'motorLink')
         T = 20;
         freq = [50, 5, 0.5, 0.05];
         delay = zeros(size(freq));
         uniformInterval = [-0.2 0.2; -0.2 0.2; 0.1 0.15; -0.02 0.02];
 %         uniformInterval = [-0.2 0.2; -0.4 0.2; 0.1 0.15; -0.01 0];
+    else
+        T = 10;
+        freq = [50, 5, 0.5, 0.05, 0.5];
+        delay = zeros(size(freq));
+        uniformInterval = [-2 2; -2 2; 1 1.5; -0.2 0.2; -1.5 -1];
     end
 
     amp = (uniformInterval(:, 2) - uniformInterval(:, 1)) / 2;
@@ -50,9 +54,13 @@ function value = sweepsine(t, T, amp, freq, offset)
     if abs(t - 0) < 1e-10
         iPhase = 1;
     else
-        iPhase = ceil(t / lenPhase);
+        iPhase = min(ceil(t / lenPhase), nSins);
     end
-    diffPhase = (freq(iPhase+1) - freq(iPhase)) / (2 * lenPhase);
+    if iPhase < nSins
+        diffPhase = (freq(iPhase+1) - freq(iPhase)) / (2 * lenPhase);
+    else
+        diffPhase = 0;
+    end
     value = amp * sin(2*pi*(freq(iPhase)*t + diffPhase*t^2)) + offset;
 end
 

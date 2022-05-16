@@ -4,17 +4,21 @@ function tsIdentification(isLoad, sysName)
 % isLoad: 1, if load dataset; 0 if create
 
     if nargin == 1
-        sysName = 'motor_link';
+        sysName = 'motorLink';
     end
-    % u = [u_1 ... u_m]', x = [x_1 ... x_n]'
-    if strcmp(sysName, 'motor_link')
+    % u = [u_1 ... u_r]', x = [x_1 ... x_n]'
+    if strcmp(sysName, 'motorLink')
         rhs = @sys.rhsMotorLink;
-        m = 1;      
+        r = 1;      
         n = 2;
-    else
+        uRange = [-0.5, 0.5];
+        x0 = [0; 0];
+    elseif strcmp(sysName, 'invPend')
         rhs = @sys.rhsInvPend;
-        m = 1;
+        r = 1;
         n = 4;
+        uRange = [-3 3];
+        x0 = [0.1; pi/30; -0.05; -pi/10];
     end
     
     T = 1;
@@ -24,13 +28,13 @@ function tsIdentification(isLoad, sysName)
     if isLoad == 1
         load(dataName, 'dataset')
     else
-        if strcmp(sysName, 'motor_link')
+        if strcmp(sysName, 'motorLink')
             x0Ranges = [-pi/2 pi/2; -2*pi 2*pi];
-        else
-            x0Ranges = [-0.1 0.1; 0 2*pi; -1 1; -pi pi];
+        elseif strcmp(sysName, 'invPend')
+            x0Ranges = [-0.1 0.1; -pi pi; -1 1; -5*pi 5*pi];
         end
         x0Grid = uniformGrid(x0Ranges, 4);
-        dataset = collectData(rhs, x0Grid, T, learnStep, m);
+        dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r);
         save(dataName, 'dataset')
     end
 
@@ -45,12 +49,16 @@ function tsIdentification(isLoad, sysName)
 
     % 2. identify consequents of extended model: x(k+1) ~ f(x(k), u(k))
     % Note: u(k) is not included in if-condition
-    tsModel = addInput(tsModel, [-0.5 0.5], 'Name', 'u(t)');
+    [nControls, ~] = size(uRange);
+    for iControl=1:nControls
+        tsModel = addInput(tsModel, uRange(iControl, :), ...
+                           'Name', ['u_' num2str(iControl) '(t)']);
+    end
     % consequent: coefficients for u are zero -> u doesn't affect output  
 %     plotIdentified(tsModel, rhs, method, 20, learnStep)
 
-    thenParams = bls(tsModel, dataset, m, n);
-    thenParams = utils.addBiasNules(thenParams, nRules, n, m);
+    thenParams = bls(tsModel, dataset, r, n);
+    thenParams = utils.addBiasNules(thenParams, nRules, n, r);
     thenParams = reshape(thenParams, 1, []);
     [~, out] = getTunableSettings(tsModel);
     tsModel = setTunableValues(tsModel, out, thenParams);
@@ -59,16 +67,16 @@ function tsIdentification(isLoad, sysName)
     [nData, ~] = size(dataset); 
     RMSE = 0;
     for iData=1:nData
-        pred = evalfis(tsModel, dataset(iData, 1:n+m));
-        RMSE = RMSE + norm(dataset(iData, n+m+1:end) - pred) ^ 2;
+        pred = evalfis(tsModel, dataset(iData, 1:n+r));
+        RMSE = RMSE + norm(dataset(iData, n+r+1:end) - pred) ^ 2;
     end
     RMSE = sqrt(RMSE / nData);
     disp(['RMSE = ', num2str(RMSE)])
 
-    % 3. plot and compare
-    plotIdentified(tsModel, rhs, method, 20, learnStep, [0; 0])
+    % 4. plot and compare
+    plotIdentified(sysName, tsModel, rhs, method, 20, learnStep, x0)
 
-    % 4. save
+    % 5. save
     modelName = ['models/' sysName];
     writeFIS(tsModel, modelName)
 end
@@ -86,24 +94,33 @@ function x0Grid = uniformGrid(ranges, nPoints)
     end
 end
 
-function dataset = collectData(rhs, x0Grid, T, learnStep, m)
+function dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r)
 % create simulated data for TS model identification
+    if isequal(rhs, @sys.rhsInvPend)
+        sysName = 'invPend';
+    elseif isequal(rhs, @sys.rhsMotorLink)
+        sysName = 'motorLink';
+    end
     [nPoints, n] = size(x0Grid);
     timesteps = 0:learnStep:T;
     nSteps = length(timesteps);
-    uTrain = trainFuncs([-0.5 0.5], -2);
+    uTrain = trainFuncs(uRange, -2);    % change for r > 1
     nControls = length(uTrain);
-    dataset = zeros(nPoints * nControls * (nSteps-1), m + 2*n);
+    dataset = zeros(nPoints * nControls * (nSteps-1), r + 2*n);
     iData = 0;
     for iPoint=1:nPoints
         x0 = x0Grid(iPoint, :)';
         for iControl=1:nControls
             % 1. Integrate with initial condition = x0
             uList = arrayfun(uTrain{iControl}, timesteps)';
-            pp = spline(timesteps, uList);  % future: problems with m > 1
+            pp = spline(timesteps, uList);  % future: problems with r > 1
             u = @(t) ppval(pp, t);
             [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
-
+            if strcmp(sysName, 'invPend')  % clip angle to [-pi, pi]
+                for iStep=1:nSteps
+                    X(iStep, :) = sys.invPendWrapper(X(iStep, :));
+                end
+            end
 %             % 2. Plot
 %             figure()
 %             hold on
@@ -116,8 +133,8 @@ function dataset = collectData(rhs, x0Grid, T, learnStep, m)
             % 3. Save data from simulation
             for iStep=1:nSteps-1
                 dataset(iData+iStep, 1:n) = X(iStep, :);            
-                dataset(iData+iStep, n+1:n+m) = uList(iStep, :);
-                dataset(iData+iStep, m+n+1:end) = X(iStep+1, :);
+                dataset(iData+iStep, n+1:n+r) = uList(iStep, :);
+                dataset(iData+iStep, r+n+1:end) = X(iStep+1, :);
             end
             iData = iData + (nSteps-1);
         end
@@ -139,10 +156,10 @@ function res = trainFuncs(uniformInterval, expAlpha)
     end
 end
 
-function thenParams = bls(tsModel, dataset, m, n)
+function thenParams = bls(tsModel, dataset, r, n)
 % this function find consequents parameters of tsModel
 % using bls-algorithm on the dataset
-% m = length(u), n = length(x), x - state vector, u - control vector
+% r = length(u), n = length(x), x - state vector, u - control vector
     [nSamples, ~] = size(dataset);
     nRules = length(tsModel.Rules);
     % 1. Extract ground truth from dataset.
@@ -157,39 +174,49 @@ function thenParams = bls(tsModel, dataset, m, n)
     end
     % 3. Create Phi = [phi(1)'; ...; phi(n_d)']
 %     % comment 115 line and uncomment 113, 114 if you need bias parameter:
-%     firings = repelem(firings, 1, n+m+1);
+%     firings = repelem(firings, 1, n+r+1);
 %     input(:, end+1) = 1;  % fake input for bias parameter
-    firings = repelem(firings, 1, n+m);
+    firings = repelem(firings, 1, n+r);
     Phi = repmat(input, 1, nRules) .* firings;
     % 4. bls: use mldivide
     thenParams = Phi \ X;
 end
 
-function plotIdentified(tsModel, rhs, method, T, learnStep, x0)
+function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
+    if strcmp(sysName, 'motorLink')
+        wrapper = @(x) x;
+    elseif strcmp(sysName, 'invPend')
+        wrapper = @sys.invPendWrapper;
+    end
     timesteps = 0:learnStep:T;
     nSteps = length(timesteps);
     n = length(x0);
-    freq = [50, 5, 0.5, 0.05];
-    delay = zeros(size(freq));
-    uniformInterval = [-0.2 0.2; -0.2 0.2; 0.1 0.15; -0.02 0.02];
-    uTest = testFunctions(T, freq, delay, uniformInterval);
+    r = 1;  % future: problems with r > 1
+    uTest = testFunctions(sysName);
     nTests = length(uTest);
     X_true = zeros(nTests, nSteps, n);
     for iTest=1:nTests
         % use spline approximation of random control
         uList = arrayfun(uTest{iTest}, timesteps);
-        pp = spline(timesteps, uList); % future: problems with m > 1
+        pp = spline(timesteps, uList);  % future: problems with r > 1
         u = @(t) ppval(pp, t);  
         % collect true answers
         [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
+        for iStep=1:nSteps
+            X(iStep, :) = wrapper(X(iStep, :));
+        end
         X_true(iTest, :, :) = X;
     end
     [~, ~, n] = size(X_true);
     
     X_pred = zeros(nTests, nSteps-1, n);     % X_pred(1:2) = x0(1);
     X = zeros(nSteps, n);
-    warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
-    warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+    fTrue = zeros(nTests, nSteps, n);
+    fPred = zeros(nTests, nSteps, n);
+    Btrue = zeros(nTests, nSteps, n);
+    Bpred = zeros(nTests, nSteps, n);
+%     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
+%     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     for iTest=1:nTests
         u = uTest{iTest};
         X(:, :) = X_true(iTest, :, :);
@@ -198,9 +225,16 @@ function plotIdentified(tsModel, rhs, method, T, learnStep, x0)
                                               [X(iStep-1, :)'; ...
                                               u(timesteps(iStep-1))]);
         end
+        [~, f, fHat, B, Bhat] = utils.logger(sysName, X, nSteps, ...
+                                             n, r, tsModel, learnStep);
+        fTrue(iTest, :, :) = f;
+        fPred(iTest, :, :) = fHat;
+        Btrue(iTest, :, :) = B;
+        Bpred(iTest, :, :) = Bhat;
     end
-    warning('on', 'fuzzy:general:warnEvalfis_NoRuleFired')
-    warning('on', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+%     warning('on', 'fuzzy:general:warnEvalfis_NoRuleFired')
+%     warning('on', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+    
 
     nLines = ceil(n/2);
     nColumns = 2;
@@ -212,6 +246,22 @@ function plotIdentified(tsModel, rhs, method, T, learnStep, x0)
             plot(timesteps, X_true(iTest, :, k), timesteps, X_pred(iTest, :, k))
             legend('true', 'identified')
             title(['x_' num2str(k)])
+        end
+
+        figure()
+        for k=1:n
+            subplot(nLines, nColumns, k)
+            plot(timesteps, fTrue(iTest, :, k), timesteps, fPred(iTest, :, k))
+            legend('true', 'identified')
+            title(['f_' num2str(k)])
+        end
+
+        figure()
+        for k=1:n
+            subplot(nLines, nColumns, k)
+            plot(timesteps, Btrue(iTest, :, k), timesteps, Bpred(iTest, :, k))
+            legend('true', 'identified')
+            title(['B' num2str(k)])
         end
     end
 end
