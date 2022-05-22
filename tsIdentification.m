@@ -18,23 +18,34 @@ function tsIdentification(isLoad, sysName)
         r = 1;
         n = 4;
         uRange = [-3 3];
+%         uRange = [-97 138];
+        xRange = [-6, -pi/2, -12, -10; ...
+                   6,  pi/2,  12,  10];
         x0 = [0.1; pi/30; -0.05; -pi/10];
     end
     
     T = 1;
-    learnStep = 0.01;
+    dt = 0.01;
     method = 'SubtractiveClustering';
     dataName = ['data/' sysName];
     if isLoad == 1
         load(dataName, 'dataset')
     else
         if strcmp(sysName, 'motorLink')
-            x0Ranges = [-pi/2 pi/2; -2*pi 2*pi];
+            x0Range = [-pi/2 -2*pi; ...
+                        pi/2; 2*pi];
+            nPoints = 4;
         elseif strcmp(sysName, 'invPend')
-            x0Ranges = [-0.1 0.1; -pi pi; -1 1; -5*pi 5*pi];
+            x0Range = zeros(size(xRange));
+            xAmp = xRange(2, :) - xRange(1, :);
+            x0Range(1, :) = xRange(1, :) + 0.025 * xAmp;
+            x0Range(2, :) = xRange(2, :) - 0.025 * xAmp;
+%             x0Range = [-0.1 -pi -1 -5*pi; ...
+%                         0.1  pi  1  5*pi];
+            nPoints = 200;
         end
-        x0Grid = uniformGrid(x0Ranges, 4);
-        dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r);
+        x0Grid = uniformGrid(x0Range, nPoints);
+        dataset = collectData(rhs, x0Grid, xRange, uRange, T, dt, r);
         save(dataName, 'dataset')
     end
 
@@ -49,13 +60,12 @@ function tsIdentification(isLoad, sysName)
 
     % 2. identify consequents of extended model: x(k+1) ~ f(x(k), u(k))
     % Note: u(k) is not included in if-condition
-    [nControls, ~] = size(uRange);
-    for iControl=1:nControls
+    for iControl=1:r
         tsModel = addInput(tsModel, uRange(iControl, :), ...
                            'Name', ['u_' num2str(iControl) '(t)']);
     end
     % consequent: coefficients for u are zero -> u doesn't affect output  
-%     plotIdentified(tsModel, rhs, method, 20, learnStep)
+%     plotIdentified(tsModel, rhs, method, 20, dt)
 
     thenParams = bls(tsModel, dataset, r, n);
     thenParams = utils.addBiasNules(thenParams, nRules, n, r);
@@ -74,7 +84,7 @@ function tsIdentification(isLoad, sysName)
     disp(['RMSE = ', num2str(RMSE)])
 
     % 4. plot and compare
-    plotIdentified(sysName, tsModel, rhs, method, 20, learnStep, x0)
+    plotIdentified(sysName, tsModel, rhs, method, 10, dt, x0)
 
     % 5. save
     modelName = ['models/' sysName];
@@ -85,16 +95,16 @@ function x0Grid = uniformGrid(ranges, nPoints)
 % create grid of initial points from uniform distribution 
 % ranges(i, :) -- range of i-th component
 % nDivisions -- the number of segments into which the range is divided
-    [n, ~] = size(ranges);  % n -- length(state vector)
+    [~, n] = size(ranges);  % n -- length(state vector)
     x0Grid = zeros(nPoints, n);
     for iComponent=1:n
-        scale = ranges(iComponent, 2) - ranges(iComponent, 1);
-        bias = ranges(iComponent, 1);
+        scale = ranges(2, iComponent) - ranges(1, iComponent);
+        bias = ranges(1, iComponent);
         x0Grid(:, iComponent) = scale * rand(nPoints, 1) + bias;
     end
 end
 
-function dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r)
+function dataset = collectData(rhs, x0Grid, xRange, uRange, T, dt, r)
 % create simulated data for TS model identification
     if isequal(rhs, @sys.rhsInvPend)
         sysName = 'invPend';
@@ -102,12 +112,17 @@ function dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r)
         sysName = 'motorLink';
     end
     [nPoints, n] = size(x0Grid);
-    timesteps = 0:learnStep:T;
+    timesteps = 0:dt:T;
     nSteps = length(timesteps);
     uTrain = trainFuncs(uRange, -2);    % change for r > 1
     nControls = length(uTrain);
     dataset = zeros(nPoints * nControls * (nSteps-1), r + 2*n);
     iData = 0;
+    if isempty(xRange)
+        options = odeset('Events', []);
+    else
+        options = odeset('Events', @(t, x) xRangeEvent(x, xRange));
+    end
     for iPoint=1:nPoints
         x0 = x0Grid(iPoint, :)';
         for iControl=1:nControls
@@ -115,20 +130,19 @@ function dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r)
             uList = arrayfun(uTrain{iControl}, timesteps)';
             pp = spline(timesteps, uList);  % future: problems with r > 1
             u = @(t) ppval(pp, t);
-            [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
+            [t, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0, options);
+            nSteps = length(t);
             if strcmp(sysName, 'invPend')  % clip angle to [-pi, pi]
                 for iStep=1:nSteps
                     X(iStep, :) = sys.invPendWrapper(X(iStep, :));
                 end
             end
+
 %             % 2. Plot
 %             figure()
-%             hold on
-%             for k=1:n         % future: comment
-%                 plot(X(:, k)) 
-%             end
-% %             legend('x', 'theta', 'x_dot', 'theta_dot')
-%             hold off
+%             plot(t, X)
+%             legend('$x$','$\theta$', '$\dot{x}$', '$\dot{\theta}$', ...
+%                    'Interpreter', 'latex')
 
             % 3. Save data from simulation
             for iStep=1:nSteps-1
@@ -139,6 +153,15 @@ function dataset = collectData(rhs, x0Grid, uRange, T, learnStep, r)
             iData = iData + (nSteps-1);
         end
     end
+    dataset(iData + 1:end, :) = [];
+end
+
+function [value, isterminal, direction] = xRangeEvent(x, xRange)
+    x = sys.invPendWrapper(x);
+    value = [x - xRange(1, :)'; xRange(2, :)' - x];
+    n = length(x);
+    isterminal = ones(2*n, 1);
+    direction = [-1*ones(n, 1); -1*ones(n, 1)];
 end
 
 function res = trainFuncs(uniformInterval, expAlpha)
@@ -182,13 +205,13 @@ function thenParams = bls(tsModel, dataset, r, n)
     thenParams = Phi \ X;
 end
 
-function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
+function plotIdentified(sysName, tsModel, rhs, method, T, dt, x0)
     if strcmp(sysName, 'motorLink')
         wrapper = @(x) x;
     elseif strcmp(sysName, 'invPend')
         wrapper = @sys.invPendWrapper;
     end
-    timesteps = 0:learnStep:T;
+    timesteps = 0:dt:T;
     nSteps = length(timesteps);
     n = length(x0);
     r = 1;  % future: problems with r > 1
@@ -226,7 +249,7 @@ function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
                                               u(timesteps(iStep-1))]);
         end
         [~, f, fHat, B, Bhat] = utils.logger(sysName, X, nSteps, ...
-                                             n, r, tsModel, learnStep);
+                                             n, r, tsModel, dt);
         fTrue(iTest, :, :) = f;
         fPred(iTest, :, :) = fHat;
         Btrue(iTest, :, :) = B;
@@ -235,7 +258,6 @@ function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
 %     warning('on', 'fuzzy:general:warnEvalfis_NoRuleFired')
 %     warning('on', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     
-
     nLines = ceil(n/2);
     nColumns = 2;
     for iTest=1:nTests
@@ -244,7 +266,7 @@ function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
         for k=1:n
             subplot(nLines, nColumns, k)
             plot(timesteps, X_true(iTest, :, k), timesteps, X_pred(iTest, :, k))
-            legend('true', 'identified')
+            legend('true', 'identified', 'FontSize', 14)
             title(['x_' num2str(k)])
         end
 
@@ -252,7 +274,7 @@ function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
         for k=1:n
             subplot(nLines, nColumns, k)
             plot(timesteps, fTrue(iTest, :, k), timesteps, fPred(iTest, :, k))
-            legend('true', 'identified')
+            legend('true', 'identified', 'FontSize', 14)
             title(['f_' num2str(k)])
         end
 
@@ -260,7 +282,7 @@ function plotIdentified(sysName, tsModel, rhs, method, T, learnStep, x0)
         for k=1:n
             subplot(nLines, nColumns, k)
             plot(timesteps, Btrue(iTest, :, k), timesteps, Bpred(iTest, :, k))
-            legend('true', 'identified')
+            legend('true', 'identified', 'FontSize', 14)
             title(['B' num2str(k)])
         end
     end
