@@ -3,4 +3,5 @@
 *.asv
 
 tests/
+old_scripts/
 
