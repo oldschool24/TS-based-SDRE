@@ -1,9 +1,7 @@
-function [u, fHat, hatB] = tsBasedControl(x, sysName, tsModel, ...
-                                          dt, known)
+function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
+                                                     dt, known, Q, R)
 % this function finds SDRE-control based on tsModel, x - state vector
-    if nargin < 5
-        known = [];
-    end
+    errorFlag = false;
     if strcmp(sysName, 'invPend') 
         x = sys.invPendWrapper(x);
     end
@@ -11,6 +9,11 @@ function [u, fHat, hatB] = tsBasedControl(x, sysName, tsModel, ...
     n = length(x);
     nInputs = length(tsModel.Inputs);
     r = nInputs - n;
+    if nargin < 5
+        known = [];
+        Q = 10 * eye(n);
+        R = 5 * eye(r);
+    end
 
     % 1. Calculate waveA, waveB: 
     %    tsModel(x(k), u(k)) = waveA * x(k) + waveB * u(k)
@@ -18,14 +21,14 @@ function [u, fHat, hatB] = tsBasedControl(x, sysName, tsModel, ...
     waveB = zeros(n, r);
     [~, ~, ~, ~, ruleFiring] = evalfis(tsModel, [x; zeros(r, 1)]);
     
-    if sum(ruleFiring) < 1e-12
+    if sum(ruleFiring) < 1e-20
         disp(['The rules do not work. x:' num2str(x')])
         u = zeros(r, 1);
         fHat = zeros(n, 1);
         hatB = zeros(n, 1);
+        errorFlag = true;
         return
     end
-%     assert(sum(ruleFiring)>1e-3, ['The rules do not work. x:' num2str(x')])
     
     ruleFiring = ruleFiring / sum(ruleFiring);
     [~, out] = getTunableSettings(tsModel);
@@ -77,10 +80,14 @@ function [u, fHat, hatB] = tsBasedControl(x, sysName, tsModel, ...
     fHat = hatA * x;
 
     % 3. Calculate u = SDRE(hatA, hatB)
-    Q = 10 * eye(n);
-    R = 5 * eye(r);
     P = icare(hatA, hatB, Q, R);
-    u = -inv(R) * hatB' * P * x;
+    if isempty(P)
+        disp('Solution of SDRE has not been found')
+        u = zeros(r, 1);
+        errorFlag = true;
+    else
+        u = -inv(R) * hatB' * P * x;
+    end
 end
 
 %     M = 0.5;

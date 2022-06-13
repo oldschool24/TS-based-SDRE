@@ -10,7 +10,6 @@ function dXdt = rhsInvPend(x, u, M, m, b, l, I)
         l = 0.3;
         I = 0.006;
     end
-%     u
     g = 9.8;
     dXdt = zeros(4, 1);
     dXdt(1) = x(3);

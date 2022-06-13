@@ -19,23 +19,28 @@ function res = testFunctions(sysName)
     res{end+1} = @(t) amp(1) * cos(2*pi*freq(1)*t + delay(1)) + offset(1);
     % 2. Multisine
     res{end+1} = @(t) multisine(t, amp, freq, delay, offset);
-    % 3. Sine sweep
-    res{end+1} = @(t) sweepsine(t, T, amp(1), freq, offset(1));
-    % 4. Uniform
-    res{end+1} = @(t) amp(1)*rand() + offset(1);
-    % 5. Growing uniform
-    res{end+1} = @(t) growing(t, T, amp(1), offset(1));
-    % 6. Spiky
-    res{end+1} = @(t) spiky(t, T, uniformInterval);
+%     % 3. Sine sweep
+%     res{end+1} = @(t) sweepsine(t, T, amp(1), freq, offset(1));
+%     % 4. Uniform
+%     res{end+1} = @(t) amp(1)*rand() + offset(1);
+%     % 5. Growing uniform
+%     res{end+1} = @(t) growing(t, T, amp(1), offset(1));
+%     % 6. Spiky
+%     res{end+1} = @(t) spiky(t, T, uniformInterval);
 
 %     timesteps = 0:0.01:T;
+%     figure()
+%     nColumns = 2;
+%     nLines = ceil(length(res)/nColumns);
 %     for k=1:length(res)
+%         subplot(nLines, nColumns, k)
 %         y = zeros(length(timesteps), 1);
 %         for iStep=1:length(timesteps)
 %             y(iStep) = res{k}(timesteps(iStep));
 %         end
-%         figure()
 %         plot(timesteps, y)
+%         ax = gca;
+%         ax.FontSize = 18;
 %     end
 end
 

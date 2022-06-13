@@ -1,5 +1,5 @@
-function [uList, fTrue, fPred, Btrue, Bpred] = logger(sysName, X, nSteps, ...
-                                                      n, r, tsModel, dt)
+function [uList, fTrue, fPred, Btrue, Bpred] = logger(sysName, X, r, ...
+                                                      tsModel, dt)
     if strcmp(sysName, 'invPend')
         M = 0.5;
         m = 0.2;  
@@ -8,7 +8,8 @@ function [uList, fTrue, fPred, Btrue, Bpred] = logger(sysName, X, nSteps, ...
         I = 0.006;
         g = 9.8;
     end
-
+    
+    [nSteps, n] = size(X);
     uList = zeros(nSteps, r);
     fTrue = zeros(nSteps, n);
     fPred = zeros(nSteps, n);

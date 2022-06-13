@@ -12,6 +12,8 @@ function tsIdentification(isLoad, sysName)
         r = 1;      
         n = 2;
         uRange = [-0.5, 0.5];
+        xRange = [-pi, -6*pi;
+                   pi,  6*pi];
         x0 = [0; 0];
     elseif strcmp(sysName, 'invPend')
         rhs = @sys.rhsInvPend;
@@ -29,11 +31,11 @@ function tsIdentification(isLoad, sysName)
     method = 'SubtractiveClustering';
     dataName = ['data/' sysName];
     if isLoad == 1
-        load(dataName, 'dataset')
+        load(dataName, 'trainData')
     else
         if strcmp(sysName, 'motorLink')
             x0Range = [-pi/2 -2*pi; ...
-                        pi/2; 2*pi];
+                        pi/2  2*pi];
             nPoints = 4;
         elseif strcmp(sysName, 'invPend')
             x0Range = zeros(size(xRange));
@@ -44,14 +46,14 @@ function tsIdentification(isLoad, sysName)
 %                         0.1  pi  1  5*pi];
             nPoints = 200;
         end
-        x0Grid = uniformGrid(x0Range, nPoints);
-        dataset = collectData(rhs, x0Grid, xRange, uRange, T, dt, r);
-        save(dataName, 'dataset')
+        x0Grid = utils.uniformGrid(x0Range, nPoints);
+        trainData = collectData(rhs, x0Grid, xRange, uRange, T, dt, r);
+        save(dataName, 'trainData')
     end
 
     % 1. identify number of rules and antecedents params: x(k+1) ~ f(x(k))
     opt = genfisOptions(method); 
-    tsModel = genfis(dataset(:, 1:n), dataset(:, end-n+1:end), opt);
+    tsModel = genfis(trainData(:, 1:n), trainData(:, end-n+1:end), opt);
     for k=1:n
         tsModel.Inputs(k).Name = ['x_' num2str(k) '(t)'];
         tsModel.Outputs(k).Name = ['x_' num2str(k) '(t+1)'];
@@ -67,18 +69,18 @@ function tsIdentification(isLoad, sysName)
     % consequent: coefficients for u are zero -> u doesn't affect output  
 %     plotIdentified(tsModel, rhs, method, 20, dt)
 
-    thenParams = bls(tsModel, dataset, r, n);
+    thenParams = bls(tsModel, trainData, r, n);
     thenParams = utils.addBiasNules(thenParams, nRules, n, r);
     thenParams = reshape(thenParams, 1, []);
     [~, out] = getTunableSettings(tsModel);
     tsModel = setTunableValues(tsModel, out, thenParams);
     
     % 3. Calculate the RMSE
-    [nData, ~] = size(dataset); 
+    [nData, ~] = size(trainData); 
     RMSE = 0;
     for iData=1:nData
-        pred = evalfis(tsModel, dataset(iData, 1:n+r));
-        RMSE = RMSE + norm(dataset(iData, n+r+1:end) - pred) ^ 2;
+        pred = evalfis(tsModel, trainData(iData, 1:n+r));
+        RMSE = RMSE + norm(trainData(iData, n+r+1:end) - pred) ^ 2;
     end
     RMSE = sqrt(RMSE / nData);
     disp(['RMSE = ', num2str(RMSE)])
@@ -89,19 +91,6 @@ function tsIdentification(isLoad, sysName)
     % 5. save
     modelName = ['models/' sysName];
     writeFIS(tsModel, modelName)
-end
-
-function x0Grid = uniformGrid(ranges, nPoints)
-% create grid of initial points from uniform distribution 
-% ranges(i, :) -- range of i-th component
-% nDivisions -- the number of segments into which the range is divided
-    [~, n] = size(ranges);  % n -- length(state vector)
-    x0Grid = zeros(nPoints, n);
-    for iComponent=1:n
-        scale = ranges(2, iComponent) - ranges(1, iComponent);
-        bias = ranges(1, iComponent);
-        x0Grid(:, iComponent) = scale * rand(nPoints, 1) + bias;
-    end
 end
 
 function dataset = collectData(rhs, x0Grid, xRange, uRange, T, dt, r)
@@ -121,7 +110,16 @@ function dataset = collectData(rhs, x0Grid, xRange, uRange, T, dt, r)
     if isempty(xRange)
         options = odeset('Events', []);
     else
-        options = odeset('Events', @(t, x) xRangeEvent(x, xRange));
+        if strcmp(sysName, 'invPend')
+            options = odeset('Events', ...
+                             @(t, x) utils.xRangeEvent( ...
+                             sys.invPendWrapper(x), xRange) ...
+                             );                     
+        else
+            options = odeset('Events', ...
+                             @(t, x) utils.xRangeEvent(x, xRange) ...
+                             );
+        end
     end
     for iPoint=1:nPoints
         x0 = x0Grid(iPoint, :)';
@@ -150,18 +148,10 @@ function dataset = collectData(rhs, x0Grid, xRange, uRange, T, dt, r)
                 dataset(iData+iStep, n+1:n+r) = uList(iStep, :);
                 dataset(iData+iStep, r+n+1:end) = X(iStep+1, :);
             end
-            iData = iData + (nSteps-1);
+            iData = iData + (nSteps - 1);
         end
     end
     dataset(iData + 1:end, :) = [];
-end
-
-function [value, isterminal, direction] = xRangeEvent(x, xRange)
-    x = sys.invPendWrapper(x);
-    value = [x - xRange(1, :)'; xRange(2, :)' - x];
-    n = length(x);
-    isterminal = ones(2*n, 1);
-    direction = [-1*ones(n, 1); -1*ones(n, 1)];
 end
 
 function res = trainFuncs(uniformInterval, expAlpha)
@@ -248,8 +238,7 @@ function plotIdentified(sysName, tsModel, rhs, method, T, dt, x0)
                                               [X(iStep-1, :)'; ...
                                               u(timesteps(iStep-1))]);
         end
-        [~, f, fHat, B, Bhat] = utils.logger(sysName, X, nSteps, ...
-                                             n, r, tsModel, dt);
+        [~, f, fHat, B, Bhat] = utils.logger(sysName, X, r, tsModel, dt);
         fTrue(iTest, :, :) = f;
         fPred(iTest, :, :) = fHat;
         Btrue(iTest, :, :) = B;
@@ -258,32 +247,12 @@ function plotIdentified(sysName, tsModel, rhs, method, T, dt, x0)
 %     warning('on', 'fuzzy:general:warnEvalfis_NoRuleFired')
 %     warning('on', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     
-    nLines = ceil(n/2);
-    nColumns = 2;
     for iTest=1:nTests
-        figure()
-        title(method)
-        for k=1:n
-            subplot(nLines, nColumns, k)
-            plot(timesteps, X_true(iTest, :, k), timesteps, X_pred(iTest, :, k))
-            legend('true', 'identified', 'FontSize', 14)
-            title(['x_' num2str(k)])
-        end
-
-        figure()
-        for k=1:n
-            subplot(nLines, nColumns, k)
-            plot(timesteps, fTrue(iTest, :, k), timesteps, fPred(iTest, :, k))
-            legend('true', 'identified', 'FontSize', 14)
-            title(['f_' num2str(k)])
-        end
-
-        figure()
-        for k=1:n
-            subplot(nLines, nColumns, k)
-            plot(timesteps, Btrue(iTest, :, k), timesteps, Bpred(iTest, :, k))
-            legend('true', 'identified', 'FontSize', 14)
-            title(['B' num2str(k)])
-        end
+        utils.plotEstimates('X', squeeze(X_true(iTest, :, :)), ...
+                            squeeze(X_pred(iTest, :, :)), n, timesteps)
+        utils.plotEstimates('f', squeeze(fTrue(iTest, :, :)), ...
+                            squeeze(fPred(iTest, :, :)), n, timesteps)
+        utils.plotEstimates('B', squeeze(Btrue(iTest, :, :)), ...
+                            squeeze(Bpred(iTest, :, :)), n, timesteps)
     end
 end
