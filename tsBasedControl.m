@@ -2,13 +2,20 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
                                                      dt, known, Q, R)
 % this function finds SDRE-control based on tsModel, x - state vector
     errorFlag = false;
-    if strcmp(sysName, 'invPend') 
+    if strcmp(sysName, 'motorLink')
+        n = 2;
+        r = 1;
+    elseif strcmp(sysName, 'invPend') 
         x = sys.invPendWrapper(x);
+        n = 4;
+        r = 1;
+    elseif strcmp(sysName, 'flex2link')
+        x = sys.flex2linkWrapper(x);
+        n = 8;
+        r = 2;
     end
     nRules = length(tsModel.Rules);
-    n = length(x);
-    nInputs = length(tsModel.Inputs);
-    r = nInputs - n;
+
     if nargin < 5
         known = [];
         Q = 10 * eye(n);
@@ -25,7 +32,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
         disp(['The rules do not work. x:' num2str(x')])
         u = zeros(r, 1);
         fHat = zeros(n, 1);
-        hatB = zeros(n, 1);
+        hatB = zeros(n, r);
         errorFlag = true;
         return
     end
@@ -51,29 +58,8 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
     hatA = 1/dt * (waveA - eye(n));
     hatB = 1/dt * waveB;
     if ~isempty(known)
-        if strcmp(sysName, 'motorLink')
-            A = [0, 1; -64*sin(x(1))/x(1), -5];
-            B = [0; 400];
-        elseif strcmp(sysName, 'invPend')
-            M = 0.5;
-            m = 0.2;  
-            b = 0.1;
-            l = 0.3;
-            I = 0.006;
-            g = 9.8;
-            
-            denominator = (M + m)*I + (m*l*sin(x(2)))^2 + M*m*l^2;
-            A = [0, 0, 1, 0;
-                 0, 0, 0, 1;
-                 0, g*m^2*l^2*sin(x(2))*cos(x(2))/x(2), -b*(I + m*l^2), ...
-                 -m*l*(I + m*l^2)*sin(x(2))*x(4);
-                 0, m*l*(M+m)*g*sin(x(2))/x(2), -m*l*b*cos(x(2)), ...
-                 -m^2*l^2*sin(x(2))*cos(x(2))*x(4)];
-            A(3:4, :) = A(3:4, :) / denominator;
-            B = [0; 0; ...
-                (I + m * l^2) / denominator; ...
-                m*l*cos(x(2)) / denominator];
-        end
+        A = sys.get_A(x, sysName);
+        B = sys.get_B(x, sysName);
         hatA(known, :) = A(known, :);
         hatB(known, :) = B(known, :);
     end
@@ -89,25 +75,6 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
         u = -inv(R) * hatB' * P * x;
     end
 end
-
-%     M = 0.5;
-%     m = 0.2;  
-%     b = 0.1;
-%     l = 0.3;
-%     I = 0.006;
-%     g = 9.8;
-%     denominator = (M + m)*I + (m*l*sin(x(2)))^2 + M*m*l^2;
-%     fTrue = [x(3); x(4); ...
-%         (-b*(I + m*l^2)*x(3) - m^2*l^3*sin(x(2))*x(4)^2 + ...
-%         g*m^2*l^2*sin(x(2))*cos(x(2)) - I*m*l*sin(x(2))*x(4)^2) ...
-%         / denominator; ...
-%         -m*l*(m*l*sin(x(2))*cos(x(2))*x(4)^2 + b*cos(x(2))*x(3) - ...
-%         (M+m)*g*sin(x(2))) / denominator];
-%     Btrue = [0; 0; ...
-%         (I + m * l^2) / denominator; ...
-%         m*l*cos(x(2)) / denominator];
-%     fHat - fTrue
-%     hatB - Btrue
 
     % analysis of tsModel coefs 
 %     [~, out] = getTunableSettings(tsModel);

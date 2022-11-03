@@ -9,6 +9,9 @@ function [MASE, sMAE, sMAPE] = tsValidation(sysName)
     elseif strcmp(sysName, 'motorLink')
         n = 2;
         r = 1;
+    elseif strcmp(sysName, 'flex2link')
+        n = 8;
+        r = 2;
     end
 
     % 1. load data and model

@@ -10,13 +10,17 @@ function testData = collectTestData(sysName, dt, T, xRange, nPoints, extension)
     end
     
     if strcmp(sysName, 'motorLink')
-        wrapper = @(x) x;
+        r = 1;
         rhs = @sys.rhsMotorLink;
-        r = 1;
+        wrapper = @(x) x;
     elseif strcmp(sysName, 'invPend')
-        wrapper = @sys.invPendWrapper;
-        rhs = @sys.rhsInvPend;
         r = 1;
+        rhs = @sys.rhsInvPend;
+        wrapper = @sys.invPendWrapper;
+    elseif strcmp(sysName, 'flex2link')
+        r = 2;
+        rhs = @sys.rhsFlex2link;
+        wrapper = @sys.flex2linkWrapper;
     end
 
     uTest = testFunctions(sysName); % test control functions

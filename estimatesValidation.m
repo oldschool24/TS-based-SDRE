@@ -11,6 +11,9 @@ function estimatesValidation(sysName, dt, isPlot)
     elseif strcmp(sysName, 'motorLink')
         n = 2;
         r = 1;
+    elseif strcmp(sysName, 'flex2link')
+        n = 8;
+        r = 2;
     end
 
     % 1. load data and model
@@ -29,23 +32,6 @@ function estimatesValidation(sysName, dt, isPlot)
     % 3. calculate metrics
     dispMetrics('f', fTest, fPred, fTrain, fTrainPred)
     dispMetrics('B', B_Test, B_Pred, B_Train, B_TrainPred)
-%     MASE = metrics.MASE(fTest, fPred, fTrain);
-%     sMAE = metrics.sMAE(fTest, fPred, fTrain);
-%     sMAPE_Train = metrics.sMAPE(fTrain, fTrainPred);
-%     sMAPE_Test = metrics.sMAPE(fTest, fPred);
-%     disp(['f MASE = ', num2str(MASE)]);
-%     disp(['f sMAE = ', num2str(sMAE)]);
-%     disp(['f sMAPE on train = ', num2str(sMAPE_Train)]);
-%     disp(['f sMAPE on test = ', num2str(sMAPE_Test)]);
-
-%     MASE = metrics.MASE(B_Test, B_Pred, B_Train);
-%     sMAE = metrics.sMAE(B_Test, B_Pred, B_Train);
-%     sMAPE_Train = metrics.sMAPE(B_Train, B_TrainPred);
-%     sMAPE_Test = metrics.sMAPE(B_Test, B_Pred);
-%     disp(['B MASE = ', num2str(MASE)]);
-%     disp(['B sMAE = ', num2str(sMAE)]);
-%     disp(['B sMAPE on train = ', num2str(sMAPE_Train)]);
-%     disp(['B sMAPE on test = ', num2str(sMAPE_Test)]);
 
     % 4. Plot
     [nSamplesTest, ~] = size(xTest);
