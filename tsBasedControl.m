@@ -1,6 +1,17 @@
-function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
-                                                     dt, known, Q, R)
+function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
+    x, extendedModel, sysName, dt, known, Q, R)
 % this function finds SDRE-control based on tsModel, x - state vector
+    arguments
+        x
+        extendedModel
+        sysName = 'flex2link'
+        dt double {mustBePositive} = 0.01
+        known = []
+        Q = []
+        R = []
+    end
+
+    % 0. Set default values
     errorFlag = false;
     if strcmp(sysName, 'motorLink')
         n = 2;
@@ -14,13 +25,22 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
         n = 8;
         r = 2;
     end
-    nRules = length(tsModel.Rules);
-
-    if nargin < 5
-        known = [];
+    tsModel = extendedModel.model;
+    thenParams = extendedModel.thenParams;    
+    normC = extendedModel.normC;
+    normS = extendedModel.normS;
+    if ~isempty(normC) && ~isempty(normS)
+        x = normalize(x', 2, ...
+            'center', normC(1:n), 'scale', normS(1:n));
+        x = x';
+    end
+    if isempty(Q)
         Q = 10 * eye(n);
+    end
+    if isempty(R)
         R = 5 * eye(r);
     end
+    nRules = length(tsModel.Rules);
 
     % 1. Calculate waveA, waveB: 
     %    tsModel(x(k), u(k)) = waveA * x(k) + waveB * u(k)
@@ -38,8 +58,6 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl(x, sysName, tsModel, ...
     end
     
     ruleFiring = ruleFiring / sum(ruleFiring);
-    [~, out] = getTunableSettings(tsModel);
-    thenParams = getTunableValues(tsModel, out);
     % column <-> component of state vector:
     thenParams = reshape(thenParams, [], n);
     thenParams = utils.removeBiasNules(thenParams, nRules, n, r);

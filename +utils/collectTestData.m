@@ -28,7 +28,7 @@ function testData = collectTestData(sysName, dt, T, xRange, nPoints, extension)
 
     [~, n] = size(xRange);
     x0Range = utils.extendRange(xRange, extension);
-    X0 = utils.uniformGrid(x0Range, nPoints); % set of initial conditions
+    x0Grid = utils.uniformGrid(x0Range, nPoints); % set of initial conditions
     
     timesteps = 0:dt:T;
     nSteps = length(timesteps);
@@ -38,20 +38,21 @@ function testData = collectTestData(sysName, dt, T, xRange, nPoints, extension)
     iData = 0;
     for iTest=1:nTests
         % use spline approximation of random control
-        uList = arrayfun(uTest{iTest}, timesteps)';
-        pp = spline(timesteps, uList);  % future: problems with r > 1
+        uList = arrayfun(uTest{iTest}, timesteps, 'UniformOutput', false);
+        uList = cell2mat(uList);
+        pp = spline(timesteps, uList);  
         u = @(t) ppval(pp, t);  
         % collect true answers       
         for iPoint=1:nPoints
             % integrate with initial condition = x0
-            x0 = X0(iPoint, :)';
+            x0 = x0Grid(iPoint, :)';
             [t, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0, odeOpt);
             
             % save data from simulation
             nSteps = length(t);
             for iStep=2:nSteps
                 testData(iData+iStep-1, 1:n) = wrapper(X(iStep-1, :)');
-                testData(iData+iStep-1, n+1:n+r) = uList(iStep-1, :);
+                testData(iData+iStep-1, n+1:n+r) = uList(:, iStep-1);
                 testData(iData+iStep-1, r+n+1:end) = wrapper(X(iStep, :)');
             end
             iData = iData + (nSteps - 1);

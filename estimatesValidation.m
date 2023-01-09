@@ -21,13 +21,13 @@ function estimatesValidation(sysName, dt, isPlot)
     xTrain = trainData(:, 1:n);
     load(['data/', sysName, 'Test'], 'testData')
     xTest = testData(:, 1:n);
-    tsModel = readfis(['models/' sysName '.fis']);
+    load(['models/' sysName '.mat'], 'extendedModel')
 
     % 2. predict
     [~, fTrain, fTrainPred, B_Train, B_TrainPred] = utils.logger( ...
-                                     sysName, xTrain, r, tsModel, dt);
+                                     sysName, xTrain, r, extendedModel, dt);
     [~, fTest, fPred, B_Test, B_Pred] = utils.logger(sysName, xTest, ...
-                                                     r, tsModel, dt);
+                                                     r, extendedModel, dt);
     
     % 3. calculate metrics
     dispMetrics('f', fTest, fPred, fTrain, fTrainPred)

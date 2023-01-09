@@ -1,65 +1,39 @@
-function tsIdentification(isLoad, sysName)
+function tsIdentification(isLoad, sysName, dt)
 % identification of TS fuzzy model based on IO data
 % x(k+1) ~ f(x(k), u(k)); 
 % isLoad: 1, if load dataset; 0 if create
-
-    if nargin == 1
-        sysName = 'motorLink';
-    end
-    % u = [u_1 ... u_r]', x = [x_1 ... x_n]'
-    if strcmp(sysName, 'motorLink')
-        r = 1;      
-        n = 2;
-        uRange = [-0.5;
-                   0.5];
-        xRange = [-pi, -6*pi;
-                   pi,  6*pi];
-        x0 = [0; 0];
-    elseif strcmp(sysName, 'invPend')
-        r = 1;
-        n = 4;
-        uRange = [-3;
-                   3];
-%         uRange = [-97 138];
-        xRange = [-6, -pi/2, -12, -10; ...
-                   6,  pi/2,  12,  10];
-        x0 = [0.1; pi/30; -0.05; -pi/10];
-    elseif strcmp(sysName, 'flex2link')
-        r = 2;
-        n = 8;
-%         uRange = [-211 -615; 
-%                    254  608];
-        uRange = [-1 -3.7;  % 100 times less
-                   1  3.7];
-        xRange = [-pi, -pi, -30, -70, -5*pi, -5*pi, -150, -700;  % real
-                   pi,  pi,  30,  70,  5*pi,  5*pi,  150,  700];
-        x0 = zeros(n, 1);
+    arguments
+        isLoad {mustBeNumericOrLogical} = true
+        sysName = 'motorLink'
+        dt {mustBePositive} = 0.01
     end
     
-    T = 1;
-    dt = 0.01;
-    method = 'SubtractiveClustering';
+    utils.setDefaultVars;
+
     dataName = ['data/' sysName];
-    if isLoad == 1
+    if isLoad
         load(dataName, 'trainData')
     else
-        if strcmp(sysName, 'motorLink')
-            x0Range = [-pi/2 -2*pi; ...
-                        pi/2  2*pi];
-            nPoints = 4;
-        elseif strcmp(sysName, 'invPend')
-            x0Range = zeros(size(xRange));
-            xAmp = xRange(2, :) - xRange(1, :);
-            x0Range(1, :) = xRange(1, :) + 0.025 * xAmp;    % TODO: retry it for motorLink
-            x0Range(2, :) = xRange(2, :) - 0.025 * xAmp;
-            nPoints = 200;
-        elseif strcmp(sysName, 'flex2link')
-            x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi;
-                        pi/2,  pi/2,  pi/2,  pi/2,  pi,  pi,  pi,  pi];
-            nPoints = 300;
-        end
         x0Grid = utils.uniformGrid(x0Range, nPoints);
-        trainData = collectData(sysName, x0Grid, xRange, uRange', T, dt, r);
+        if withPI   
+%             % trajectory -> ss-model -> PI-control -> dataset 
+%             trainData = collectData(sysName, x0Grid(1, :), xRange, ...
+%                 uRange'/10, T, dt, r, []);
+%             % automatic search of Kp, Ki (not reliable)
+%             [Kp, Ki] = utils.buildPI(trainData, xIdxPI, uIdxPI, dt, n);
+
+            pidCoefs = struct('Kp', Kp, 'Ki', Ki, 'xIdxPI', xIdxPI, ...
+                'uIdxPI', uIdxPI);
+            trainData = collectData(sysName, x0Grid(2:end, :), xRange, ...
+                uRange, T, dt, r, pidCoefs);
+        else
+            trainData = collectData(sysName, x0Grid, xRange, ...
+                uRange', T, dt, r, []);
+        end
+        if isNormalize
+            [trainData, normC, normS] = normalize( ...
+                trainData, 'range', [-1, 1]);
+        end
         save(dataName, 'trainData')
     end
 
@@ -79,36 +53,45 @@ function tsIdentification(isLoad, sysName)
                            'Name', ['u_' num2str(iControl) '(t)']);
     end
     % consequent: coefficients for u are zero -> u doesn't affect output  
-%     plotIdentified(tsModel, rhs, method, 20, dt)
 
     thenParams = bls(tsModel, trainData, r, n);
     thenParams = utils.addBiasNules(thenParams, nRules, n, r);
     thenParams = reshape(thenParams, 1, []);
     [~, out] = getTunableSettings(tsModel);
     tsModel = setTunableValues(tsModel, out, thenParams);
+    extendedModel.thenParams = thenParams;
 
-    % 3. Calculate the RMSE
+    % 3. save
+    modelName = ['models/' sysName];
+    extendedModel.model = tsModel;
+    if isNormalize
+        extendedModel.normC = normC(1:n+r);
+        extendedModel.normS = normS(1:n+r);
+    else
+        extendedModel.normC = [];
+        extendedModel.normS = [];
+    end
+    save(modelName, "extendedModel")
+    % writeFIS(extendedModel, modelName)
+
+    % 4. Calculate the RMSE
     [nData, ~] = size(trainData); 
     RMSE = 0;
     for iData=1:nData
         pred = evalfis(tsModel, trainData(iData, 1:n+r));
         RMSE = RMSE + norm(trainData(iData, n+r+1:end) - pred) ^ 2;
-%         trainData(iData, n+r+1:end) - pred
     end
     RMSE = sqrt(RMSE / nData);
     disp(['RMSE = ', num2str(RMSE)])
 
+    % 5. plot and compare
     tic
-    % 4. plot and compare
-    plotIdentified(sysName, tsModel, 10, dt, x0)
+    utils.plotIdentified(sysName, extendedModel, 10, dt, x0)
     toc
-
-    % 5. save
-    modelName = ['models/' sysName];
-    writeFIS(tsModel, modelName)
 end
 
-function dataset = collectData(sysName, x0Grid, xRange, uRange, T, dt, r)
+function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
+    dt, r, pidCoefs)
 % create simulated data for TS model identification
     if strcmp(sysName, 'motorLink')
         rhs = @sys.rhsMotorLink;
@@ -129,21 +112,35 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, dt, r)
         trainParams = reshape(uRange, 2, [], 2);
     end
 
+    if ~isempty(pidCoefs)
+        xIdxPI = pidCoefs.xIdxPI;
+        uIdxPI = pidCoefs.uIdxPI;
+        Kp = pidCoefs.Kp;
+        Ki = pidCoefs.Ki;
+    end
+
+    uTrain = trainFuncs(trainParams, expAmp);  
+    nControls = length(uTrain);
     [nPoints, n] = size(x0Grid);
     timesteps = 0:dt:T;
     nSteps = length(timesteps);
-    uTrain = trainFuncs(trainParams, expAmp);    
-    nControls = length(uTrain);
-    dataset = zeros(nPoints * nControls * (nSteps-1), r + 2*n);
+    dataset = zeros(nPoints * (nControls+1) * (nSteps-1), r + 2*n);
     iData = 0;
     if isempty(xRange)
         options = odeset('Events', []);
     else
         options = odeset('Events', ...
             @(t, x) utils.xRangeEvent(wrapper(x), xRange));
+        if ~isempty(pidCoefs)
+            integralRange = [-Inf(1, length(xIdxPI));
+                              Inf(1, length(xIdxPI))];
+            xRange = [xRange integralRange];
+        end
+        options_extended = odeset('Events', ...
+            @(t, x) utils.xRangeEvent(wrapper(x), xRange));
     end
-    trajsLen = zeros(nPoints*nControls, 1);
-    iTraj = 1;
+    trajsLen = zeros(nPoints, 2);
+    outOfRangePI = [];
     for iPoint=1:nPoints            % TODO: change order of for loops
         x0 = x0Grid(iPoint, :)';
         for iControl=1:nControls
@@ -155,28 +152,61 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, dt, r)
             u = @(t) ppval(pp, t);
             [t, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0, options);
             nSteps = length(t);
-            trajsLen(iTraj) = nSteps;
-            iTraj = iTraj + 1;
+            trajsLen(iPoint, 1) = nSteps;
             for iStep=1:nSteps
                 X(iStep, :) = wrapper(X(iStep, :));
             end
 
-%             % 2. Plot
-%             figure()
-%             plot(t, X)
-%             legend('$x$','$\theta$', '$\dot{x}$', '$\dot{\theta}$', ...
-%                    'Interpreter', 'latex')
-
-            % 3. Save data from simulation
+            % 2. Save data from simulation
             for iStep=1:nSteps-1
                 dataset(iData+iStep, 1:n) = X(iStep, :);            
                 dataset(iData+iStep, n+1:n+r) = uList(:, iStep)';
-                dataset(iData+iStep, r+n+1:end) = X(iStep+1, :);
+                dataset(iData+iStep, n+r+1:end) = X(iStep+1, :);
+            end
+            iData = iData + (nSteps - 1);
+        end
+        if ~isempty(pidCoefs)
+            % 1. Integrate with initial condition = x0
+            [t, X, ~, ~, ie] = ode45( ...
+                @(t, x) utils.rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki), ...
+                timesteps, [x0; zeros(r, 1)], options_extended);
+            outOfRangePI = [outOfRangePI; ie];
+
+            % 2. Data postprocessing
+            nSteps = length(t);
+            trajsLen(iPoint, 2) = nSteps;
+            uList = zeros(nSteps, r);
+            for iStep=1:nSteps
+                for k=1:r
+                    err = X(iStep, xIdxPI(k));   % reference = 0
+                    I = X(iStep, n+k);
+                    uList(iStep, uIdxPI(k)) = Kp(k)*err + Ki(k)*I;
+                end
+                X(iStep, :) = wrapper(X(iStep, :));
+            end
+            X(:, end-r+1 : end) = [];
+
+            % 3. Save data from simulation
+            for iStep=1:nSteps-1
+                dataset(iData+iStep, 1:n) = X(iStep, :);  
+                dataset(iData+iStep, n+1:n+r) = uList(iStep, :);
+                dataset(iData+iStep, n+r+1:end) = X(iStep+1, :);
             end
             iData = iData + (nSteps - 1);
         end
     end
     dataset(iData + 1:end, :) = [];
+    
+    if ~isempty(outOfRangePI)
+        [numberOfTimes, violatedComponent] = groupcounts(outOfRangePI);
+        tableOfViolations = table(violatedComponent, numberOfTimes);
+        disp('going beyond xRange under PI-control')
+        disp(tableOfViolations)
+    end
+    disp(['mean trajectory length: random control -- ' ...
+          num2str(mean(trajsLen(:, 1))) ...
+          ', PI control -- ' ...
+          num2str(mean(trajsLen(:, 2)))])
 end
 
 function res = trainFuncs(uniformInterval, expAlpha)
@@ -220,75 +250,4 @@ function thenParams = bls(tsModel, dataset, r, n)
     Phi = repmat(input, 1, nRules) .* firings;
     % 4. bls: use mldivide
     thenParams = Phi \ X;
-end
-
-function plotIdentified(sysName, tsModel, T, dt, x0)
-    if strcmp(sysName, 'motorLink')
-        rhs = @sys.rhsMotorLink;
-        wrapper = @(x) x;
-        r = 1;
-    elseif strcmp(sysName, 'invPend')
-        rhs = @sys.rhsInvPend;
-        wrapper = @sys.invPendWrapper;
-        r = 1;
-    elseif strcmp(sysName, 'flex2link')
-        rhs = @sys.rhsFlex2link;
-        wrapper = @sys.flex2linkWrapper;
-        r = 2;
-    end
-
-    timesteps = 0:dt:T;
-    nSteps = length(timesteps);
-    n = length(x0);
-    uTest = testFunctions(sysName);
-    nTests = length(uTest);
-    X_true = zeros(nTests, nSteps, n);
-    for iTest=1:nTests
-        % use spline approximation of random control
-        uList = arrayfun(uTest{iTest}, timesteps, 'UniformOutput', false);
-        uList = cell2mat(uList);
-        pp = spline(timesteps, uList);  
-        u = @(t) ppval(pp, t);  
-        % collect true answers
-        [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
-        for iStep=1:nSteps
-            X(iStep, :) = wrapper(X(iStep, :));
-        end
-        X_true(iTest, :, :) = X;
-    end
-    [~, ~, n] = size(X_true);
-    
-    X_pred = zeros(nTests, nSteps-1, n);     % X_pred(1:2) = x0(1);
-    X = zeros(nSteps, n);
-    fTrue = zeros(nTests, nSteps, n);
-    fPred = zeros(nTests, nSteps, n);
-    Btrue = zeros(nTests, nSteps, n, r);
-    Bpred = zeros(nTests, nSteps, n, r);
-%     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
-%     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
-    for iTest=1:nTests
-        u = uTest{iTest};
-        X(:, :) = X_true(iTest, :, :);
-        for iStep=2:nSteps
-            X_pred(iTest, iStep, :) = evalfis(tsModel, ...
-                                              [X(iStep-1, :)'; ...
-                                              u(timesteps(iStep-1))]);
-        end
-        [~, f, fHat, B, Bhat] = utils.logger(sysName, X, r, tsModel, dt);
-        fTrue(iTest, :, :) = f;
-        fPred(iTest, :, :) = fHat;
-        Btrue(iTest, :, :, :) = B;
-        Bpred(iTest, :, :, :) = Bhat;
-    end
-%     warning('on', 'fuzzy:general:warnEvalfis_NoRuleFired')
-%     warning('on', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
-    
-    for iTest=1:nTests
-        utils.plotEstimates('X', squeeze(X_true(iTest, :, :)), ...
-                            squeeze(X_pred(iTest, :, :)), n, timesteps)
-        utils.plotEstimates('f', squeeze(fTrue(iTest, :, :)), ...
-                            squeeze(fPred(iTest, :, :)), n, timesteps)
-        utils.plotEstimates('B', squeeze(Btrue(iTest, :, :, :)), ...
-                            squeeze(Bpred(iTest, :, :, :)), n, timesteps)
-    end
 end

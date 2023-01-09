@@ -57,12 +57,12 @@ function res = testFunctions(sysName)
     res{end+1} = @(t) multisine(t, amp, freq, delay, offset);
     % 3. Sine sweep
     res{end+1} = @(t) sweepsine(t, T, amp(:, 1), freq, offset(:, 1));
-%     % 4. Uniform
-%     res{end+1} = @(t) amp(:, 1).*rand(r, 1) + offset(:, 1);
-%     % 5. Growing uniform
-%     res{end+1} = @(t) growing(t, T, amp(:, 1), offset(:, 1), r);
-%     % 6. Spiky
-%     res{end+1} = @(t) spiky(t, T, uniformInterval, r);
+    % 4. Uniform
+    res{end+1} = @(t) amp(:, 1).*rand(r, 1) + offset(:, 1);
+    % 5. Growing uniform
+    res{end+1} = @(t) growing(t, T, amp(:, 1), offset(:, 1), r);
+    % 6. Spiky
+    res{end+1} = @(t) spiky(t, T, uniformInterval, r);
 % 
 %     % uncomment if you need plots
 %     timesteps = 0:0.01:T;
