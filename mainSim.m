@@ -1,5 +1,6 @@
-function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, ...
-                                                dt, T, x0, Q, R, ode)
+function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
+                                                T, x0, Q, R, ode, ...
+                                                isWarn, imgPath)
     arguments
         modelPath = 'motorLink.fis';
         sysName = 'motorLink';
@@ -9,6 +10,8 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, ...
         Q = 10 * eye(2);
         R = 5;
         ode = @ode45;  % flex2link: ode23s faster
+        isWarn = false;
+        imgPath = 'results/imgs/mainSim/';
     end
 
     % 0.1 Set default values
@@ -85,6 +88,11 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, ...
         direction = 0;
     end
 
+    if ~isWarn
+        warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
+        warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+    end
+
     % 1.1 integrate
     timesteps = 0:dt:T;
     rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
@@ -127,39 +135,39 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, ...
         end
     
         % 3. Plot u, estimates and trajectories
-        figure('Name', 'Controls')
-        plot(timesteps, sdreList, timesteps, uList)
-        legend('SDRE', 'tsBased', 'FontSize', 24)
-        ax = gca;
-        ax.FontSize = 18;
-    
-        for k=1:n
-            figure()
-            title(['f' num2str(k)])
-            plot(timesteps, fTrue(:, k), timesteps, fPred(:, k))
-            legend(['f' num2str(k)], ['f' num2str(k) 'Pred'], 'FontSize', 18)
-    
-            figure()
-            title(['B' num2str(k)])
-            plot(timesteps, Btrue(:, k), timesteps, Bpred(:, k))
-            legend(['B' num2str(k)], ['B' num2str(k) 'Pred'], 'FontSize', 18)
+        plotComparison('Controls', timesteps, sdreList, uList)
+        utils.plotEstimates('f', fTrue, fPred, n, timesteps)
+        for k=1:r
+            utils.plotEstimates(['B^' num2str(k)], ...
+                Btrue(:, :, k), Bpred(:, :, k), n, timesteps)
         end
-        figure('Name', 'Trajectories')
-        % TODO: AUTOMATIC COLOURS!
-        lineSpec = ["r-", "r--"; "g-", "g--"; "b-", "b--"; "k-", "k--"];
-        labels = cell(2*n, 1);
-        hold on
-        for k=1:n
-            plot(timesteps, sdreX(:, k), lineSpec(k, 1), ...
-                 timesteps, tsX(:, k), lineSpec(k, 2))
-            labels{2*k - 1} = ['x' num2str(k) '(SDRE)'];
-            labels{2*k} = '';
-        end
-        legend(labels, 'FontSize', 24)
-        hold off
-        ax = gca;
-        ax.FontSize = 18;
+        plotComparison('Trajectories', timesteps, sdreX, tsX)
+        % saveas(gcf, [imgPath sysName '-traj-' num2str(x0')], 'png')
     end
+end
+
+function plotComparison(name, timesteps, sdreData, tsData)
+    figure('Name', name)
+    if strcmp(name, 'Controls')
+        varName = 'u';
+    elseif strcmp(name, 'Trajectories')
+        varName = 'x';
+    end
+
+    [~, nComponents] = size(sdreData);
+    labels = cell(2*nComponents, 1);
+    hold on
+    for k=1:nComponents
+        sdreLine = plot(timesteps, sdreData(:, k), 'LineWidth', 1.5);
+        labels{2*k - 1} = [varName num2str(k) '(SDRE)'];
+        color = get(sdreLine, 'Color');
+        plot(timesteps, tsData(:, k), '--', 'Color', color, 'LineWidth', 1.5)
+        labels{2*k} = '';
+    end
+    legend(labels, 'FontSize', 24)
+    hold off
+    ax = gca;
+    ax.FontSize = 18;
 end
 
 function dispTime(name, time)
