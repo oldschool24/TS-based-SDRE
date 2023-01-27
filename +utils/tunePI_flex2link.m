@@ -1,4 +1,4 @@
-nPoints = 5;
+nPoints = 3;
 
 sysName = 'flex2link';
 wrapper = @sys.flex2linkWrapper;
@@ -22,15 +22,23 @@ xRange = [xRange integralRange];
 options_extended = odeset('Events', ...
     @(t, x) utils.xRangeEvent(wrapper(x), xRange));
 
-% 1. настроены по отдельности
+% % 1. PI: configured individually
 % Kp = [-400; -200];
 % Ki = [20; 15];
 
-% 2. настроены совместно
+% % 2. PI: configured together
+% Kp = [-220; -120];
+% Ki = [7; 4];
+
+% 3. PID: configured together
 Kp = [-220; -120];
 Ki = [7; 4];
+Kd = [-0.6; 0.01]; 
+% Kp = [-250; -70];
+% Ki = [7; 1];
+% Kd = [-0.2; -0.05]; 
 
-timesteps = 0:0.1:160;
+timesteps = 0:0.01:30;
 
 for iPoint=1:nPoints
     x0 = x0Grid(iPoint, :)';
@@ -39,7 +47,7 @@ for iPoint=1:nPoints
 
     % 1. Integrate with initial condition = x0
     [t, X] = ode45( ...
-        @(t, x) utils.rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki), ...
+        @(t, x) utils.rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki, Kd), ...
         timesteps, [x0; zeros(r, 1)]);
             
     % 2. Data postprocessing
@@ -55,10 +63,10 @@ for iPoint=1:nPoints
     end
     X(:, end-r+1 : end) = [];
 
-%     figure()
-%     plot(t, X(:, 1:2))
-%     lgd = legend('x_1', 'x_2');
-%     lgd.FontSize = 14;
+    figure()
+    plot(t, X(:, 1:2))
+    lgd = legend('x_1', 'x_2');
+    lgd.FontSize = 14;
 % 
 %     figure()
 %     plot(t, uList)

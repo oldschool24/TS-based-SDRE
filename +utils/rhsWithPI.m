@@ -1,13 +1,28 @@
-function dXdt = rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki)
+function dXdt = rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki, Kd)
     % x = [state; Integral of error for PIDs]
     dXdt = zeros(size(x));
     r = length(xIdxPI); 
+    
+    if strcmp(sysName, 'flex2link')
+        xdotIdx = [5, 6, 7, 8, -1, -1, -1, -1]; % x1_dot = x5, ...
+    else
+        xdotIdx = [];
+    end
+
     u = zeros(r, 1);
     I = x(end-r+1 : end);
     for k=1:r
-        err = x(xIdxPI(k));   % reference = 0 (stabilisation)
+        componentNum = xIdxPI(k);
+        err = x(componentNum);   % reference = 0 (stabilisation)
         u(uIdxPI(k)) = Kp(k)*err + Ki(k)*I(k);
         dXdt(end - r + k) = err;
+        if ~isempty(xdotIdx)
+            dotComponentNum = xdotIdx(componentNum);
+            if dotComponentNum ~= -1
+                errDot = x(dotComponentNum);
+                u(uIdxPI(k)) = u(uIdxPI(k)) + Kd(k) * errDot;
+            end
+        end
     end
 
     x = x(1:end-r);   % x = state

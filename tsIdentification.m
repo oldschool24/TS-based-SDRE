@@ -22,8 +22,8 @@ function tsIdentification(isLoad, sysName, dt)
 %             % automatic search of Kp, Ki (not reliable)
 %             [Kp, Ki] = utils.buildPI(trainData, xIdxPI, uIdxPI, dt, n);
 
-            pidCoefs = struct('Kp', Kp, 'Ki', Ki, 'xIdxPI', xIdxPI, ...
-                'uIdxPI', uIdxPI);
+            pidCoefs = struct('Kp', Kp, 'Ki', Ki, 'Kd', Kd, ...
+                'xIdxPI', xIdxPI, 'uIdxPI', uIdxPI);
             trainData = collectData(sysName, x0Grid(2:end, :), xRange, ...
                 uRange, T, dt, r, pidCoefs);
         else
@@ -86,7 +86,7 @@ function tsIdentification(isLoad, sysName, dt)
 
     % 5. plot and compare
     tic
-    utils.plotIdentified(sysName, extendedModel, 10, dt, x0)
+    utils.plotIdentified(sysName, extendedModel, 5, dt, x0)
     toc
 end
 
@@ -96,20 +96,20 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
     if strcmp(sysName, 'motorLink')
         rhs = @sys.rhsMotorLink;
         wrapper = @(x) x;
-        expAmp = -2;
-        trainParams = reshape(uRange, 1, [], 2);
+        expAlpha = -2;
+        trainParams = reshape(uRange', 1, [], 2);
     elseif strcmp(sysName, 'invPend')
         rhs = @sys.rhsInvPend;
         wrapper = @sys.invPendWrapper;
-        expAmp = -2;
-        trainParams = reshape(uRange, 1, [], 2);
+        expAlpha = -2;
+        trainParams = reshape(uRange', 1, [], 2);
     elseif strcmp(sysName, 'flex2link')
         rhs = @sys.rhsFlex2link;
         wrapper = @sys.flex2linkWrapper;
-%         expAmp = [-2;
-%                   -2];
-        expAmp = [];
-        trainParams = reshape(uRange, 2, [], 2);
+%         expAlpha = [-2;
+%                     -2];
+        expAlpha = [];
+        trainParams = reshape(uRange', 2, [], 2);
     end
 
     if ~isempty(pidCoefs)
@@ -117,9 +117,10 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
         uIdxPI = pidCoefs.uIdxPI;
         Kp = pidCoefs.Kp;
         Ki = pidCoefs.Ki;
+        Kd = pidCoefs.Kd;
     end
 
-    uTrain = trainFuncs(trainParams, expAmp);  
+    uTrain = trainFuncs(trainParams, expAlpha);  
     nControls = length(uTrain);
     [nPoints, n] = size(x0Grid);
     timesteps = 0:dt:T;
@@ -139,7 +140,7 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
         options_extended = odeset('Events', ...
             @(t, x) utils.xRangeEvent(wrapper(x), xRange));
     end
-    trajsLen = zeros(nPoints, 2);
+    trajsLen = zeros(nPoints, nControls+1);
     outOfRangePI = [];
     for iPoint=1:nPoints            % TODO: change order of for loops
         x0 = x0Grid(iPoint, :)';
@@ -152,7 +153,7 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
             u = @(t) ppval(pp, t);
             [t, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0, options);
             nSteps = length(t);
-            trajsLen(iPoint, 1) = nSteps;
+            trajsLen(iPoint, iControl) = nSteps;
             for iStep=1:nSteps
                 X(iStep, :) = wrapper(X(iStep, :));
             end
@@ -168,13 +169,13 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
         if ~isempty(pidCoefs)
             % 1. Integrate with initial condition = x0
             [t, X, ~, ~, ie] = ode45( ...
-                @(t, x) utils.rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki), ...
+                @(t, x) utils.rhsWithPI(x, sysName, xIdxPI, uIdxPI, Kp, Ki, Kd), ...
                 timesteps, [x0; zeros(r, 1)], options_extended);
             outOfRangePI = [outOfRangePI; ie];
 
             % 2. Data postprocessing
             nSteps = length(t);
-            trajsLen(iPoint, 2) = nSteps;
+            trajsLen(iPoint, end) = nSteps;
             uList = zeros(nSteps, r);
             for iStep=1:nSteps
                 for k=1:r
@@ -203,10 +204,20 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
         disp('going beyond xRange under PI-control')
         disp(tableOfViolations)
     end
-    disp(['mean trajectory length: random control -- ' ...
-          num2str(mean(trajsLen(:, 1))) ...
-          ', PI control -- ' ...
-          num2str(mean(trajsLen(:, 2)))])
+
+    if isempty(expAlpha)
+        disp(['mean trajectory length: random control -- ' ...
+            num2str(mean(trajsLen(:, 1))) ...       
+            ', PI control -- ' ...
+            num2str(mean(trajsLen(:, 2)))])     % TODO: case nFuncs > 1
+    else
+        disp(['mean trajectory length: random control -- ' ...
+              num2str(mean(trajsLen(:, 1))) ...
+              ', sin*exp control -- ' ...
+              num2str(mean(trajsLen(:, 2))) ...  % TODO: case nFuncs > 1
+              ', PI control -- ' ...
+              num2str(mean(trajsLen(:, 3)))])
+    end
 end
 
 function res = trainFuncs(uniformInterval, expAlpha)
@@ -222,7 +233,8 @@ function res = trainFuncs(uniformInterval, expAlpha)
     end
     for iExp=1:nExp
         amp = uniformInterval(:, randi(nFuncs), 2);
-        res{nFuncs + iExp} = @(t) amp .* exp(expAlpha(:, iExp) * t);
+        alpha = expAlpha(:, iExp);
+        res{nFuncs + iExp} = @(t) amp .* sin(5* alpha * t) .* exp(alpha * t);
     end
 end
 
