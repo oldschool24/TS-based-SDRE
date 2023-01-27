@@ -55,4 +55,5 @@ elseif strcmp(sysName, 'flex2link')
     uIdxPI = [1, 2];
     Kp = [-220; -120];
     Ki = [7; 4];
+    Kd = [-0.6; 0.01]; 
 end
