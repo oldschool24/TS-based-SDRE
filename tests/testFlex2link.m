@@ -1,4 +1,5 @@
 addpath('../')
+dt = 0.01;
 q1Range = -pi:pi/2:pi;
 q2Range = -pi:pi/2:pi;
 z1Range = [-350, 350];
@@ -18,7 +19,7 @@ for q1=q1Range
                 x0 = [q1; q2; z1; z2; 0; 0; 0; 0];
                 tic
                 [tsCriterion, sdreCriterion] = mainSim( ...
-                    '../models/flex2link.mat', 'flex2link', 0.01, 40, ...
+                    '../models/flex2link.mat', 'flex2link', dt, 40, ...
                     x0, Q, R, @ode23s);
                 toc
                 criterion(k, 1) = tsCriterion;

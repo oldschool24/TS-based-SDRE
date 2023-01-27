@@ -1,4 +1,5 @@
 addpath('../')
+dt = 0.01;
 thetaRange = -pi/2:pi/9:pi/2;
 thetadotRange = -pi/2:pi/9:pi/2;
 Q = 5*eye(2);
@@ -14,7 +15,7 @@ for theta=thetaRange
     for thetadot=thetadotRange
         tic
         [tsCriterion, sdreCriterion] = mainSim(@sys.rhsMotorLink, ...
-            0.01, 10, readfis('../models/motorLink.fis'), ...
+            dt, 10, readfis('../models/motorLink.fis'), ...
             [theta; thetadot], Q, R);
         toc
         criterion(k, 1) = tsCriterion;

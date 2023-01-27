@@ -1,4 +1,5 @@
 addpath('../')
+dt = 0.01;
 xRange = -1:0.5:1;
 thetaRange = -pi/2.5:pi/6:pi/2.5;
 xdotRange = [-0.5, 0.5];
@@ -9,8 +10,8 @@ R = 5;
 nTests = length(xRange) * length(thetaRange) * length(xdotRange) * length(thetadotRange);
 criterion = zeros(nTests, 2);  % 1st column - ts-based SDRE, 2nd - SDRE
 k = 1;
-    warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
-    warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
+warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
 for x=xRange
     for theta=thetaRange
         for xdot=xdotRange
