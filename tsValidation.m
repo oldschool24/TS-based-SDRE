@@ -19,7 +19,12 @@ function [MASE, sMAE, sMAPE] = tsValidation(sysName)
     xTrain = trainData(:, end-n+1:end);
     load(['data/', sysName, 'Test'], 'testData')
     xTest = testData(:, end-n+1:end);
-    tsModel = readfis(['models/' sysName '.fis']);
+    if isfile(['models/' sysName '.fis'])
+        tsModel = readfis(['models/' sysName '.fis']);
+    else
+        load(['models/' sysName '.mat'], "extendedModel")
+        tsModel = extendedModel.model;
+    end
     
     % 2. predict
     [nSamples, ~] = size(testData);

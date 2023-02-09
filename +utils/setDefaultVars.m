@@ -1,4 +1,3 @@
-T = 1;
 method = 'SubtractiveClustering';
 
 % u = [u_1 ... u_r]', x = [x_1 ... x_n]'
@@ -14,6 +13,7 @@ if strcmp(sysName, 'motorLink')
     withPI = false;
     x0Range = [-pi/2 -2*pi; ...
                 pi/2  2*pi];
+    T = 1;
     nPoints = 4;
 elseif strcmp(sysName, 'invPend')
     r = 1;
@@ -30,6 +30,7 @@ elseif strcmp(sysName, 'invPend')
     xAmp = xRange(2, :) - xRange(1, :);
     x0Range(1, :) = xRange(1, :) + 0.025 * xAmp;    % TODO: retry it for motorLink
     x0Range(2, :) = xRange(2, :) - 0.025 * xAmp;
+    T = 1;
     nPoints = 200;
 elseif strcmp(sysName, 'flex2link')
     r = 2;
@@ -48,7 +49,8 @@ elseif strcmp(sysName, 'flex2link')
 
     x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi; 
                 pi/2,  pi/2,  pi/2,  pi/2,  pi,  pi,  pi,  pi];
-    nPoints = 300;
+    T = 1;        % dt = 0.01 => 1
+    nPoints = 300;   % dt = 0.01 => 300
 
     withPI = true;
     xIdxPI = [1, 2];

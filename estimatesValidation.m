@@ -31,7 +31,11 @@ function estimatesValidation(sysName, dt, isPlot)
     
     % 3. calculate metrics
     dispMetrics('f', fTest, fPred, fTrain, fTrainPred)
-    dispMetrics('B', B_Test, B_Pred, B_Train, B_TrainPred)
+    for iControl=1:r
+        dispMetrics(['B^' num2str(iControl)], ...
+            B_Test(:, :, iControl), B_Pred(:, :, iControl), ...
+            B_Train(:, :, iControl), B_TrainPred(:, :, iControl))
+    end
 
     % 4. Plot
     [nSamplesTest, ~] = size(xTest);
