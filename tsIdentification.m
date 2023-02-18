@@ -74,17 +74,7 @@ function tsIdentification(isLoad, sysName, dt)
     save(modelName, "extendedModel")
     % writeFIS(extendedModel, modelName)
 
-    % 4. Calculate the RMSE
-    [nData, ~] = size(trainData); 
-    RMSE = 0;
-    for iData=1:nData
-        pred = evalfis(tsModel, trainData(iData, 1:n+r));
-        RMSE = RMSE + norm(trainData(iData, n+r+1:end) - pred) ^ 2;
-    end
-    RMSE = sqrt(RMSE / nData);
-    disp(['RMSE = ', num2str(RMSE)])
-
-    % 5. plot and compare
+    % 4. plot and compare
     tic
     utils.plotIdentified(sysName, extendedModel, 5, dt, x0)
     toc

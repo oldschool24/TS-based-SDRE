@@ -48,7 +48,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     waveB = zeros(n, r);
     [~, ~, ~, ~, ruleFiring] = evalfis(tsModel, [x; zeros(r, 1)]);
     
-    if sum(ruleFiring) < 1e-20
+    if sum(ruleFiring) <= 0
         disp(['The rules do not work. x:' num2str(x')])
         u = zeros(r, 1);
         fHat = zeros(n, 1);

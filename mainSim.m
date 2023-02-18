@@ -1,6 +1,6 @@
 function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
                                                 T, x0, Q, R, ode, ...
-                                                isWarn, imgPath)
+                                                isPlot, isWarn, imgPath)
     arguments
         modelPath = 'motorLink.fis';
         sysName = 'motorLink';
@@ -10,6 +10,7 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
         Q = 10 * eye(2);
         R = 5;
         ode = @ode45;  % flex2link: ode23s faster
+        isPlot = false;
         isWarn = false;
         imgPath = 'results/imgs/mainSim/';
     end
@@ -99,50 +100,58 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
                                 extendedModel, dt, known);
     tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS);
     [t, tsX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], tsOpt);
-
+    rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
     if tsFailed
-        disp(['TS-based SDRE does not work. x:' num2str(tsX(end, :))])
+        disp(['TS-based SDRE does not work. x:' num2str(tsX(end, 1:end-1))])
         disp(['t:' num2str(t(end))])
         tsCriterion = -1;
-        sdreCriterion = -1;
     else
-%         dispTime('TS-based control', tsTime)
         tsCriterion = tsX(end, end);
         disp(['Criterion value of new method: ' num2str(tsCriterion)])
-        tsX(:, end) = [];       % delete column with criterion values
-%         dispTime('rhs evaluation', intTime)
-        
-        rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
-        [~, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
-%         dispTime('SDRE control', sdreTime)
-        sdreCriterion = sdreX(end, end);
-        disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
+    end
+    [~, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
+    sdreCriterion = sdreX(end, end);
+    disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
+    %   dispTime('TS-based control', tsTime)
+    %   dispTime('rhs evaluation', intTime)
+    %   dispTime('SDRE control', sdreTime)
 
-%         % 1.2 process data for plot
-%         sdreX(:, end) = [];     % delete column with criterion values
-%         nSteps = length(timesteps);
-%         for iStep=1:nSteps
-%             tsX(iStep, :) = wrapper(tsX(iStep, :));
-%             sdreX(iStep, :) = wrapper(sdreX(iStep, :));
-%         end
-%     
-%         % 2. Calculate u and estimates(f, B) at timesteps
-%         [uList, fTrue, fPred, Btrue, Bpred] = utils.logger( ...
-%             sysName, tsX, r, extendedModel, dt);
-%         sdreList = zeros(nSteps, r);
-%         for iStep=1:nSteps
-%             sdreList(iStep, :) = sdre(sdreX(iStep, :)', sysName, Q, R);
-%         end
-%     
-%         % 3. Plot u, estimates and trajectories
-%         plotComparison('Controls', timesteps, sdreList, uList)
-%         utils.plotEstimates('f', fTrue, fPred, n, timesteps)
-%         for k=1:r
-%             utils.plotEstimates(['B^' num2str(k)], ...
-%                 Btrue(:, :, k), Bpred(:, :, k), n, timesteps)
-%         end
-%         n = max(n, 4);
-%         plotComparison('Trajectories', timesteps, sdreX(:, 1:n), tsX(:, 1:n))
+    if isPlot
+        % 1.2 process data for plot
+        sdreX(:, end) = [];     % delete column with criterion values
+        tsX(:, end) = [];       
+        [nSteps, ~] = size(tsX);
+        timesteps(nSteps+1 : end) = [];
+        for iStep=1:nSteps
+            tsX(iStep, :) = wrapper(tsX(iStep, :));
+            sdreX(iStep, :) = wrapper(sdreX(iStep, :));
+        end
+    
+        % 2. Calculate u and estimates(f, B) at timesteps
+        [uList, fTrue, fPred, Btrue, Bpred] = utils.logger( ...
+            sysName, tsX, r, extendedModel, dt);
+        sdreList = zeros(nSteps, r);
+        for iStep=1:nSteps
+            sdreList(iStep, :) = sdre(sdreX(iStep, :)', sysName, Q, R);
+        end
+    
+        % 3. Plot u, estimates and trajectories
+        plotComparison('Controls', timesteps, sdreList, uList)
+        utils.plotEstimates('f', fTrue, fPred, n, timesteps)
+        for k=1:r
+            utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
+                                Bpred(:, :, k), n, timesteps)
+        end
+        if n > 4
+            half = floor(n/2);
+            plotComparison('Trajectories', timesteps, ...
+                           sdreX(1:nSteps, 1:half), tsX(:, 1:half))
+            plotComparison('Trajectories', timesteps, ...
+                           sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
+        else
+            plotComparison('Trajectories', timesteps, ...
+                           sdreX(1:nSteps, 1:n), tsX(:, 1:n))
+        end
         % saveas(gcf, [imgPath sysName '-traj-' num2str(x0')], 'png')
     end
 end

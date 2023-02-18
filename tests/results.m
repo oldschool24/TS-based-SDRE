@@ -5,7 +5,11 @@ function res = results(mat_path)
     load(mat_path, 'criterion')
 
     nPoints = length(criterion);
-    indSucceed = all(criterion(:, end-1:end) > -1, 2);
+
+    % TODO: check line
+    indSucceed = all(criterion(:, end-1) > -1, 2);
+    
+    
     newCriterion = criterion(indSucceed, :);
     nSucceed = sum(indSucceed);
     new2old = zeros(nSucceed, 1);

@@ -1,4 +1,4 @@
-function testData = collectTestData(sysName, dt, T, xRange, nPoints, extension)
+function testData = collectTestData(sysName, dt, T, xRange, nPoints, reduction)
     arguments
         sysName = 'invPend';
         dt = 0.01;
@@ -6,7 +6,7 @@ function testData = collectTestData(sysName, dt, T, xRange, nPoints, extension)
         xRange = [-6, -pi/2, -12, -10; ...
                    6,  pi/2,  12,  10];
         nPoints = 10;
-        extension = 0.05;
+        reduction = 0.05;
     end
     
     if strcmp(sysName, 'motorLink')
@@ -27,7 +27,7 @@ function testData = collectTestData(sysName, dt, T, xRange, nPoints, extension)
     nTests = length(uTest);
 
     [~, n] = size(xRange);
-    x0Range = utils.extendRange(xRange, extension);
+    x0Range = utils.reduceRange(xRange, reduction);
     x0Grid = utils.uniformGrid(x0Range, nPoints); % set of initial conditions
     
     timesteps = 0:dt:T;

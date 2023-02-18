@@ -11,8 +11,7 @@ if strcmp(sysName, 'motorLink')
     x0 = [0; 0];
     isNormalize = false;
     withPI = false;
-    x0Range = [-pi/2 -2*pi; ...
-                pi/2  2*pi];
+    reduction = 0.5;
     T = 1;
     nPoints = 4;
 elseif strcmp(sysName, 'invPend')
@@ -26,10 +25,7 @@ elseif strcmp(sysName, 'invPend')
     x0 = [0.1; pi/30; -0.05; -pi/10];
     isNormalize = false;
     withPI = false;
-    x0Range = zeros(size(xRange));
-    xAmp = xRange(2, :) - xRange(1, :);
-    x0Range(1, :) = xRange(1, :) + 0.025 * xAmp;    % TODO: retry it for motorLink
-    x0Range(2, :) = xRange(2, :) - 0.025 * xAmp;
+    reduction = 0.05;
     T = 1;
     nPoints = 200;
 elseif strcmp(sysName, 'flex2link')
@@ -37,8 +33,6 @@ elseif strcmp(sysName, 'flex2link')
     n = 8;
 %         uRange = [-211 -615; 
 %                    254  608];
-    uRange = [-1 -3.7;  % 100 times less
-               1  3.7];
 %     xRange = [-pi, -pi, -30, -70, -5*pi, -5*pi, -150, -700;  % real
 %                pi,  pi,  30,  70,  5*pi,  5*pi,  150,  700];
     xRange = [-pi, -pi, -700, -500, -7*pi, -9*pi, -4*10^4, -4*10^4; 
@@ -47,10 +41,13 @@ elseif strcmp(sysName, 'flex2link')
     isNormalize = false;
 
 
-    x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi; 
-                pi/2,  pi/2,  pi/2,  pi/2,  pi,  pi,  pi,  pi];
-    T = 1;        % dt = 0.01 => 1
-    nPoints = 300;   % dt = 0.01 => 300
+    uRange = [-20 -50;  
+               20  50];
+%     x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi; 
+%                 pi/2,  pi/2,  pi/2,  pi/2,  pi,  pi,  pi,  pi];
+    reduction = 0.4;
+    T = 0.7;         % dt = 0.01 => 1
+    nPoints = 240;   % dt = 0.01 => 300
 
     withPI = true;
     xIdxPI = [1, 2];
@@ -59,3 +56,5 @@ elseif strcmp(sysName, 'flex2link')
     Ki = [7; 4];
     Kd = [-0.6; 0.01]; 
 end
+
+x0Range = utils.reduceRange(xRange, reduction);
