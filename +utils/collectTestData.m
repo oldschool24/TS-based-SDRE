@@ -1,12 +1,12 @@
 function testData = collectTestData(sysName, dt, T, xRange, nPoints, reduction)
     arguments
-        sysName = 'invPend';
-        dt = 0.01;
-        T = 10;
+        sysName
+        dt double {mustBePositive}
+        T = 10
         xRange = [-6, -pi/2, -12, -10; ...
-                   6,  pi/2,  12,  10];
-        nPoints = 10;
-        reduction = 0.05;
+                   6,  pi/2,  12,  10]
+        nPoints = 10
+        reduction = 0.05
     end
     
     if strcmp(sysName, 'motorLink')

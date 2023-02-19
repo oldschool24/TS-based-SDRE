@@ -3,9 +3,9 @@ function tsIdentification(isLoad, sysName, dt)
 % x(k+1) ~ f(x(k), u(k)); 
 % isLoad: 1, if load dataset; 0 if create
     arguments
-        isLoad {mustBeNumericOrLogical} = true
-        sysName = 'motorLink'
-        dt {mustBePositive} = 0.01
+        isLoad {mustBeNumericOrLogical}
+        sysName
+        dt double {mustBePositive}
     end
     
     utils.setDefaultVars;

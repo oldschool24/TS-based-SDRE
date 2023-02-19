@@ -2,17 +2,17 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
                                                 T, x0, Q, R, ode, ...
                                                 isPlot, isWarn, imgPath)
     arguments
-        modelPath = 'motorLink.fis';
-        sysName = 'motorLink';
-        dt = 0.01;
-        T = 0.5;
-        x0 = [-pi/2; -3*pi];  % change it sometime
-        Q = 10 * eye(2);
-        R = 5;
-        ode = @ode45;  % flex2link: ode23s faster
-        isPlot = false;
-        isWarn = false;
-        imgPath = 'results/imgs/mainSim/';
+        modelPath
+        sysName
+        dt double {mustBePositive}
+        T = 0.5
+        x0 = [-pi/2; -3*pi]  % change it sometime
+        Q = 10 * eye(2)
+        R = 5
+        ode = @ode45  % flex2link: ode23s faster
+        isPlot = false
+        isWarn = false
+        imgPath = 'results/imgs/mainSim/'
     end
 
     % 0.1 Set default values

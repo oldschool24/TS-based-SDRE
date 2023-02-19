@@ -4,8 +4,8 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     arguments
         x
         extendedModel
-        sysName = 'flex2link'
-        dt double {mustBePositive} = 0.01
+        sysName
+        dt double {mustBePositive}
         known = []
         Q = []
         R = []

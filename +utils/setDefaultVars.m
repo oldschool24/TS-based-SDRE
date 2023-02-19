@@ -45,9 +45,9 @@ elseif strcmp(sysName, 'flex2link')
                20  50];
 %     x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi; 
 %                 pi/2,  pi/2,  pi/2,  pi/2,  pi,  pi,  pi,  pi];
-    reduction = 0.4;
-    T = 0.7;         % dt = 0.01 => 1
-    nPoints = 240;   % dt = 0.01 => 300
+    reduction = 0.7;
+    T = 1;         % dt = 0.01 => 1
+    nPoints = 300;   % dt = 0.01 => 300
 
     withPI = true;
     xIdxPI = [1, 2];

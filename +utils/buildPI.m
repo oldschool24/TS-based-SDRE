@@ -3,7 +3,7 @@ function [Kp, Ki] = buildPI(data, xIdxPI, uIdxPI, dt, n, order, isPlot)
         data
         xIdxPI
         uIdxPI
-        dt {mustBePositive}
+        dt double {mustBePositive}
         n {mustBePositive}
         order {mustBePositive} = 1
         isPlot {mustBeNumericOrLogical} = false

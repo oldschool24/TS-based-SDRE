@@ -1,8 +1,8 @@
 function estimatesValidation(sysName, dt, isPlot)
     arguments
-        sysName = 'invPend';
-        dt = 0.01;
-        isPlot = true;
+        sysName
+        dt double {mustBePositive}
+        isPlot = true
     end
 
     if strcmp(sysName, 'invPend')
