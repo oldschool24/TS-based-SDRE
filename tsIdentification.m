@@ -9,8 +9,13 @@ function tsIdentification(isLoad, sysName, dt)
     end
     
     utils.setDefaultVars;
+    modelName = [sysName '(dt-' num2str(dt) ...
+                 '_T-' num2str(T) ...
+                 '_N-' num2str(nPoints) ...
+                 '_reduct-' num2str(reduction) ...
+                 ').mat'];
 
-    dataName = ['data/' sysName];
+    dataName = ['data/' modelName];
     if isLoad
         load(dataName, 'trainData')
     else
@@ -62,7 +67,7 @@ function tsIdentification(isLoad, sysName, dt)
     extendedModel.thenParams = thenParams;
 
     % 3. save
-    modelName = ['models/' sysName];
+    modelName = ['models/' modelName];
     extendedModel.model = tsModel;
     if isNormalize
         extendedModel.normC = normC(1:n+r);

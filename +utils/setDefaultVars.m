@@ -40,7 +40,6 @@ elseif strcmp(sysName, 'flex2link')
     x0 = zeros(n, 1);
     isNormalize = false;
 
-
     uRange = [-20 -50;  
                20  50];
 %     x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi; 

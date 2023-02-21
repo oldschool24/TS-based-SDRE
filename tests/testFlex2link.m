@@ -1,4 +1,6 @@
-function testFlex2link(dt, T, nPoints, q, r)
+function testFlex2link(modelPath, q, r)
+    [dt, T, nPoints, reduction] = extractParams(modelPath);
+
     addpath('../')
     q1Range = -pi:pi/2:pi;
     q2Range = -pi:pi/2:pi;
@@ -19,7 +21,7 @@ function testFlex2link(dt, T, nPoints, q, r)
                     x0 = [q1; q2; z1; z2; 0; 0; 0; 0];
                     tic
                     [tsCriterion, sdreCriterion] = mainSim( ...
-                        '../models/flex2link.mat', 'flex2link', dt, 15, ...
+                        modelPath, 'flex2link', dt, 15, ...
                         x0, Q, R, @ode23s);
                     toc
                     criterion(k, 1:8) = x0';
@@ -33,8 +35,26 @@ function testFlex2link(dt, T, nPoints, q, r)
     expName = ['../results/testFlex2link(dt-' num2str(dt) ...
                '_T-' num2str(T) ...
                '_N-' num2str(nPoints) ...
+               '_reduct-' num2str(reduction) ...
                '_q-' num2str(q) ...
                '_r-' num2str(r) ...
                ').mat'];
     save(expName, 'criterion')
+end
+
+function [dt, T, nPoints, reduction] = extractParams(modelPath)
+    dtStart = strfind(modelPath, 'dt-') + 3;
+    dtEnd = strfind(modelPath, '_T-') - 1;
+    dt = str2double(modelPath(dtStart : dtEnd));
+
+    T_Start = dtEnd + 4;
+    T_End = strfind(modelPath, '_N-') - 1;
+    T = str2num(modelPath(T_Start : T_End));
+
+    nPointsStart = T_End + 4;
+    nPointsEnd = strfind(modelPath, '_reduct-') - 1;
+    nPoints = str2num(modelPath(nPointsStart : nPointsEnd));
+    
+    reductStart = nPointsEnd + 9;
+    reduction = str2double(modelPath(reductStart : end-1));
 end
