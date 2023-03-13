@@ -112,55 +112,71 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
     [~, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
     sdreCriterion = sdreX(end, end);
     disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
+    sdreX(:, end) = [];     % delete column with criterion values
+    tsX(:, end) = [];
     %   dispTime('TS-based control', tsTime)
     %   dispTime('rhs evaluation', intTime)
     %   dispTime('SDRE control', sdreTime)
 
-    if isPlot
-        % 1.2 process data for plot
-        sdreX(:, end) = [];     % delete column with criterion values
-        tsX(:, end) = [];       
-        [nSteps, ~] = size(tsX);
-        timesteps(nSteps+1 : end) = [];
-        for iStep=1:nSteps
-            tsX(iStep, :) = wrapper(tsX(iStep, :));
-            sdreX(iStep, :) = wrapper(sdreX(iStep, :));
-        end
-    
-        % 2. Calculate u and estimates(f, B) at timesteps
+    if isPlot    
+        % 2.1 Calculate u, estimates(x, f, B) at timesteps
         [uList, fTrue, fPred, Btrue, Bpred] = utils.logger( ...
             sysName, tsX, r, extendedModel, dt);
-        sdreList = zeros(nSteps, r);
+        [nSteps, ~] = size(tsX);
+        sdreList = zeros(nSteps, r);    % SDRE values at timesteps
         for iStep=1:nSteps
             sdreList(iStep, :) = sdre(sdreX(iStep, :)', sysName, Q, R);
         end
-    
-        % 3. Plot u, estimates and trajectories
-        plotComparison('Controls', timesteps, sdreList, uList)
-        utils.plotEstimates('f', fTrue, fPred, n, timesteps)
-        for k=1:r
-            utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
-                                Bpred(:, :, k), n, timesteps)
+
+        % 2.2 process trajectories for plot
+        timesteps(nSteps+1 : end) = [];
+        predX = zeros(nSteps, n);   % tsModel preds (sys under ts-control)
+        for iStep=1:nSteps
+            tsX(iStep, :) = wrapper(tsX(iStep, :));
+            sdreX(iStep, :) = wrapper(sdreX(iStep, :));
+            if iStep > 1
+                predX(iStep, :) = evalfis(extendedModel.model, ...
+                    [tsX(iStep-1, :), uList(iStep-1, :)]);
+            end
         end
+        predX(1, :) = tsX(1, :);
+    
+        % 2.3 Plot u, estimates and trajectories
+        plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, uList)
+%         utils.plotEstimates('f', fTrue, fPred, n, timesteps)
+%         for k=1:r
+%             utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
+%                                 Bpred(:, :, k), n, timesteps)
+%         end
         if n > 4
             half = floor(n/2);
-            plotComparison('Trajectories', timesteps, ...
-                           sdreX(1:nSteps, 1:half), tsX(:, 1:half))
-            plotComparison('Trajectories', timesteps, ...
-                           sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
+%             plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
+%                            sdreX(1:nSteps, 1:half), tsX(:, 1:half))
+%             plotComparison('Trajectories', 'SDRE', half, timesteps, ...
+%                            sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
+            plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
+                           tsX(:, 1:2), predX(:, 1:2))
+            plotComparison('Trajectories-Preds', 'TS', 2, timesteps, ...
+                           tsX(:, 3:4), predX(:, 3:4))
+            plotComparison('Trajectories-Preds', 'TS', 4, timesteps, ...
+                           tsX(:, 5:6), predX(:, 5:6))
+            plotComparison('Trajectories-Preds', 'TS', 6, timesteps, ...
+                           tsX(:, 7:8), predX(:, 7:8))
         else
-            plotComparison('Trajectories', timesteps, ...
+            plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
                            sdreX(1:nSteps, 1:n), tsX(:, 1:n))
+            plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
+                           tsX(:, 1:n), predX(:, 1:n))
         end
         % saveas(gcf, [imgPath sysName '-traj-' num2str(x0')], 'png')
     end
 end
 
-function plotComparison(name, timesteps, sdreData, tsData)
-    figure('Name', name)
-    if strcmp(name, 'Controls')
+function plotComparison(figName, lineName, kStart, timesteps, sdreData, tsData)
+    figure('Name', figName)
+    if strcmp(figName, 'Controls')
         varName = 'u';
-    elseif strcmp(name, 'Trajectories')
+    else
         varName = 'x';
     end
 
@@ -169,7 +185,7 @@ function plotComparison(name, timesteps, sdreData, tsData)
     hold on
     for k=1:nComponents
         sdreLine = plot(timesteps, sdreData(:, k), 'LineWidth', 1.5);
-        labels{2*k - 1} = [varName num2str(k) '(SDRE)'];
+        labels{2*k - 1} = [varName num2str(k + kStart) '(' lineName ')'];
         color = get(sdreLine, 'Color');
         plot(timesteps, tsData(:, k), '--', 'Color', color, 'LineWidth', 1.5)
         labels{2*k} = '';

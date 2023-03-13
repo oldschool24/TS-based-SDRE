@@ -1,28 +1,24 @@
-function [MASE, sMAE, sMAPE] = tsValidation(sysName)
-    arguments
-        sysName = 'invPend'
-    end
-
-    if strcmp(sysName, 'invPend')
+function [MASE, sMAE, sMAPE] = tsValidation(modelPath, trainPath, testPath)
+    if contains(trainPath, 'invPend')
         n = 4;
         r = 1;
-    elseif strcmp(sysName, 'motorLink')
+    elseif contains(trainPath, 'motorLink')
         n = 2;
         r = 1;
-    elseif strcmp(sysName, 'flex2link')
+    elseif contains(trainPath, 'flex2link')
         n = 8;
         r = 2;
     end
 
     % 1. load data and model
-    load(['data/', sysName], 'trainData')
+    load(trainPath, 'trainData')
     xTrain = trainData(:, end-n+1:end);
-    load(['data/', sysName, 'Test'], 'testData')
+    load(testPath, 'testData')
     xTest = testData(:, end-n+1:end);
-    if isfile(['models/' sysName '.fis'])
-        tsModel = readfis(['models/' sysName '.fis']);
+    if isfile(modelPath)
+        tsModel = readfis(modelPath);
     else
-        load(['models/' sysName '.mat'], "extendedModel")
+        load(modelPath, "extendedModel")
         tsModel = extendedModel.model;
     end
     
