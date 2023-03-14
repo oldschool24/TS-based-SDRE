@@ -24,26 +24,26 @@ function res = testFunctions(sysName)
 %                 30, 5, 0.5, 0.05, 0.5];
         delay = zeros(size(freq));
         uniformInterval = zeros(r, 5, 2);
-        uniformInterval(1, :, :) = [-3  3; 
-                                    -3  3; 
-                                    1.5 2.75; 
-                                  -0.25 0.25;
-                                  -2.75 -1.5];
-        uniformInterval(2, :, :) = [-3  3;
-                                    -3  3; 
-                                    1.5 2.75; 
-                                  -0.25 0.25;
-                                  -2.75 -1.5];
-%         uniformInterval(1, :, :) = [-5  5; 
-%                                     -5  5; 
-%                                     2.5 3.75; 
-%                                    -0.5 0.5;
-%                                   -3.75 -2.5];
-%         uniformInterval(2, :, :) = [-5  5;
-%                                     -5  5; 
-%                                     2.5 3.75; 
-%                                    -0.5 0.5;
-%                                   -3.75 -2.5];
+%         uniformInterval(1, :, :) = [-3  3; 
+%                                     -3  3; 
+%                                     1.5 2.75; 
+%                                   -0.25 0.25;
+%                                   -2.75 -1.5];
+%         uniformInterval(2, :, :) = [-3  3;
+%                                     -3  3; 
+%                                     1.5 2.75; 
+%                                   -0.25 0.25;
+%                                   -2.75 -1.5];
+        uniformInterval(1, :, :) = [-30  30; 
+                                    -30  30; 
+                                     15  21; 
+                                     -3  3;
+                                    -21 -15];
+        uniformInterval(2, :, :) = [-20  20; 
+                                    -20  20; 
+                                     10  14; 
+                                     -2  2;
+                                    -14 -10];
     end
     amp = (uniformInterval(:, :, 2) - uniformInterval(:, :, 1)) / 2;
     amp = squeeze(amp);
@@ -63,7 +63,7 @@ function res = testFunctions(sysName)
     res{end+1} = @(t) growing(t, T, amp(:, 1), offset(:, 1), r);
     % 6. Spiky
     res{end+1} = @(t) spiky(t, T, uniformInterval, r);
-% 
+
 %     % uncomment if you need plots
 %     timesteps = 0:0.01:T;
 %     figure()
@@ -75,7 +75,6 @@ function res = testFunctions(sysName)
 %         for iStep=1:length(timesteps)
 %             y(iStep, :) = res{k}(timesteps(iStep));
 %         end
-%         size(res{k}(timesteps(iStep)))
 %         plot(timesteps, y)
 %         ax = gca;
 %         ax.FontSize = 18;
