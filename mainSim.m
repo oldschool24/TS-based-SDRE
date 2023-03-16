@@ -131,12 +131,14 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
         % 2.2 process trajectories for plot
         timesteps(nSteps+1 : end) = [];
         predX = zeros(nSteps, n);   % tsModel preds (sys under ts-control)
+        tsModel = extendedModel.model;
+        modelRange = extendedModel.range;
         for iStep=1:nSteps
             tsX(iStep, :) = wrapper(tsX(iStep, :));
             sdreX(iStep, :) = wrapper(sdreX(iStep, :));
             if iStep > 1
-                predX(iStep, :) = evalfis(extendedModel.model, ...
-                    [tsX(iStep-1, :), uList(iStep-1, :)]);
+                predX(iStep, :) = utils.evalProjection( ...
+                    tsModel, [tsX(iStep-1, :), uList(iStep-1, :)], modelRange);
             end
         end
         predX(1, :) = tsX(1, :);

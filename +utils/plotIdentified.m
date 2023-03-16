@@ -48,6 +48,7 @@ function plotIdentified(sysName, extendedModel, T, dt, x0)
     [~, ~, n] = size(X_true);
     
     tsModel = extendedModel.model;
+    modelRange = extendedModel.range;
     X_pred = zeros(nTests, nSteps-1, n);     % X_pred(1:2) = x0(1);
     X = zeros(nSteps, n);
     fTrue = zeros(nTests, nSteps, n);
@@ -67,7 +68,8 @@ function plotIdentified(sysName, extendedModel, T, dt, x0)
             else
                 inp = [X(iStep-1, :)'; u(timesteps(iStep-1))];
             end
-            X_pred(iTest, iStep, :) = evalfis(tsModel, inp);
+            X_pred(iTest, iStep, :) = utils.evalProjection(tsModel, inp, ...
+                                                           modelRange);
         end
         [~, f, fHat, B, Bhat] = utils.logger(sysName, X, r, extendedModel, dt);
         fTrue(iTest, :, :) = f;

@@ -9,7 +9,7 @@ function tsIdentification(isLoad, sysName, dt)
     end
     
     utils.setDefaultVars;
-    modelName = [sysName '(dt-' num2str(dt) ...
+    modelName = [sysName '(not-dt-' num2str(dt) ...
                  '_T-' num2str(T) ...
                  '_N-' num2str(nPoints) ...
                  '_reduct-' num2str(reduction) ...
@@ -69,6 +69,7 @@ function tsIdentification(isLoad, sysName, dt)
     % 3. save
     modelName = ['models/' modelName];
     extendedModel.model = tsModel;
+    extendedModel.range = utils.getTsRange(tsModel, n);
     if isNormalize
         extendedModel.normC = normC(1:n+r);
         extendedModel.normS = normS(1:n+r);

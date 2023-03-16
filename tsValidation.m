@@ -15,18 +15,16 @@ function [MASE, sMAE, sMAPE] = tsValidation(modelPath, trainPath, testPath)
     xTrain = trainData(:, end-n+1:end);
     load(testPath, 'testData')
     xTest = testData(:, end-n+1:end);
-    if isfile(modelPath)
-        tsModel = readfis(modelPath);
-    else
-        load(modelPath, "extendedModel")
-        tsModel = extendedModel.model;
-    end
+    load(modelPath, "extendedModel")
+    tsModel = extendedModel.model;
+    modelRange = extendedModel.range;
     
     % 2. predict
     [nSamples, ~] = size(testData);
     xPred = zeros(nSamples, n);
     for iSample=1:nSamples
-        xPred(iSample, :) = evalfis(tsModel, testData(iSample, 1:n+r)');
+        xPred(iSample, :) = utils.evalProjection( ...
+            tsModel, testData(iSample, 1:n+r)', modelRange);
     end
     
     % 3. calculate metrics

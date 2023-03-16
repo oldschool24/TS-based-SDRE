@@ -35,8 +35,8 @@ elseif strcmp(sysName, 'flex2link')
 %                    254  608];
 %     xRange = [-pi, -pi, -30, -70, -5*pi, -5*pi, -150, -700;  % real
 %                pi,  pi,  30,  70,  5*pi,  5*pi,  150,  700];
-    xRange = [-pi, -pi, -700, -500, -7*pi, -9*pi, -4*10^4, -4*10^4; 
-               pi,  pi,  700,  500,  7*pi,  9*pi,  4*10^4,  4*10^4];
+    xRange = [-20, -20, -700, -500, -7*pi, -9*pi, -4*10^4, -4*10^4; 
+               20,  20,  700,  500,  7*pi,  9*pi,  4*10^4,  4*10^4];
     x0 = zeros(n, 1);
     isNormalize = false;
 

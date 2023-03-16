@@ -28,6 +28,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     end
     tsModel = extendedModel.model;
     thenParams = extendedModel.thenParams;    
+    modelRange = extendedModel.range;
     normC = extendedModel.normC;
     normS = extendedModel.normS;
     if ~isempty(normC) && ~isempty(normS)
@@ -47,7 +48,8 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     %    tsModel(x(k), u(k)) = waveA * x(k) + waveB * u(k)
     waveA = zeros(n, n);
     waveB = zeros(n, r);
-    [~, ~, ~, ~, ruleFiring] = evalfis(tsModel, [wrapped_x; zeros(r, 1)]);
+    [~, ~, ~, ~, ruleFiring] = utils.evalProjection( ...
+        tsModel, [wrapped_x; zeros(r, 1)], modelRange);
     
     if sum(ruleFiring) <= 0
         disp(['The rules do not work. x:' num2str(x')])
