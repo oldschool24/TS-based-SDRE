@@ -24,41 +24,39 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
     else
         load(modelPath, "extendedModel")
     end
+    tsOpt = odeset('RelTol', 1e-3, 'AbsTol', 1e-6); 
+    sdreOpt = odeset('RelTol', 1e-3, 'AbsTol', 1e-6);
     if strcmp(sysName, 'motorLink')
         wrapper = @(x) x;
         n = 2;
         r = 1;
         known = [];
-        tsOpt = odeset('RelTol', 1e-3, 'AbsTol', 1e-6); 
-        sdreOpt = odeset('RelTol', 1e-3, 'AbsTol', 1e-6);
     elseif strcmp(sysName, 'invPend')
         wrapper = @sys.invPendWrapper;
         n = 4;
         r = 1;
         known = [];
-        tsOpt = odeset('RelTol', 1e-3, 'AbsTol', 1e-6);
-        sdreOpt = odeset('RelTol', 1e-3, 'AbsTol', 1e-6);
     elseif strcmp(sysName, 'flex2link')
         wrapper = @sys.flex2linkWrapper;
         n = 8;
         r = 2;
         known = [];
-        tsOpt = odeset('RelTol', 1e-1, 'AbsTol', 5e-3); % default: 1e-3, 1e-6
-        sdreOpt = odeset('RelTol', 1e-1, 'AbsTol', 5e-3);
+        tsOpt = odeset('RelTol', 5e-3, 'AbsTol', 5e-6); % ode23s (long)
+        sdreOpt = odeset('RelTol', 5e-3, 'AbsTol', 5e-6);
     end
     tsFailed = false;  % var for event detection
 
 %     tsTime = [];
 %     sdreTime = [];
 %     intTime = [];
-    
+
     % 0.2 add calculation of criterion to rhs
     function dXdt = rhsWithCriterion(x, uName, sysName, Q, R, ...
                                      extendedModel, dt, known)
         if strcmp(uName, 'tsBased')
 %             tStart = tic;
-            [u, ~, ~, errorFlag] = tsBasedControl(x, extendedModel, ...
-                                                  sysName, dt, known, Q, R);
+            [u, ~, ~, errorFlag] = tsBasedControl( ...
+                x, extendedModel, sysName, dt, known, Q, R);
 %             tEnd = toc(tStart);
 %             tsTime = [tsTime; tEnd];
             tsFailed = or(tsFailed, errorFlag); 
@@ -99,7 +97,9 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
     rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
                                 extendedModel, dt, known);
     tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS);
+    tic
     [t, tsX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], tsOpt);
+    toc
     rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
     if tsFailed
         disp(['TS-based SDRE does not work. x:' num2str(tsX(end, 1:end-1))])
@@ -144,7 +144,7 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
         predX(1, :) = tsX(1, :);
     
         % 2.3 Plot u, estimates and trajectories
-%         plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, uList)
+        plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, uList)
         utils.plotEstimates('f', fTrue, fPred, n, timesteps)
 %         for k=1:r
 %             utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
@@ -152,18 +152,18 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
 %         end
         if n > 4
             half = floor(n/2);
-%             plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
-%                            sdreX(1:nSteps, 1:half), tsX(:, 1:half))
+            plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
+                           sdreX(1:nSteps, 1:half), tsX(:, 1:half))
             plotComparison('Trajectories', 'SDRE', half, timesteps, ...
                            sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
-            plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
-                           tsX(:, 1:2), predX(:, 1:2))
-            plotComparison('Trajectories-Preds', 'TS', 2, timesteps, ...
-                           tsX(:, 3:4), predX(:, 3:4))
-            plotComparison('Trajectories-Preds', 'TS', 4, timesteps, ...
-                           tsX(:, 5:6), predX(:, 5:6))
-            plotComparison('Trajectories-Preds', 'TS', 6, timesteps, ...
-                           tsX(:, 7:8), predX(:, 7:8))
+%             plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
+%                            tsX(:, 1:2), predX(:, 1:2))
+%             plotComparison('Trajectories-Preds', 'TS', 2, timesteps, ...
+%                            tsX(:, 3:4), predX(:, 3:4))
+%             plotComparison('Trajectories-Preds', 'TS', 4, timesteps, ...
+%                            tsX(:, 5:6), predX(:, 5:6))
+%             plotComparison('Trajectories-Preds', 'TS', 6, timesteps, ...
+%                            tsX(:, 7:8), predX(:, 7:8))
         else
             plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
                            sdreX(1:nSteps, 1:n), tsX(:, 1:n))

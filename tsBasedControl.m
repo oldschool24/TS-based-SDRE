@@ -51,6 +51,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     [~, ~, ~, ~, ruleFiring] = utils.evalProjection( ...
         tsModel, [wrapped_x; zeros(r, 1)], modelRange);
     
+    % TODO: remove after check on grid
     if sum(ruleFiring) <= 0
         disp(['The rules do not work. x:' num2str(x')])
         u = zeros(r, 1);

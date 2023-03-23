@@ -22,7 +22,7 @@ function testFlex2link(modelPath, q, r)
                     tic
                     [tsCriterion, sdreCriterion] = mainSim( ...
                         modelPath, 'flex2link', dt, 15, ...
-                        x0, Q, R, @ode23s);
+                        x0, Q, R, @ode15s);
                     toc
                     criterion(k, 1:8) = x0';
                     criterion(k, 9) = tsCriterion;

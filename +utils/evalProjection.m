@@ -12,6 +12,7 @@ function [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring] = evalProjection(
             projection(k) = input(k);
         end
     end
+    projection(n+1:end) = input(n+1:end);
     [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring] = evalfis( ...
         tsModel, projection);
 end

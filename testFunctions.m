@@ -50,19 +50,19 @@ function res = testFunctions(sysName)
     offset = (uniformInterval(:, :, 1) + uniformInterval(:, :, 2)) / 2;
     offset = squeeze(offset);
 
-%     % 1. Simple periodic
-%     res{end+1} = @(t) amp(:, 1) .* ...
-%                       cos(2*pi*freq(:, 1)*t + delay(:, 1)) + offset(:, 1);
-%     % 2. Multisine
-%     res{end+1} = @(t) multisine(t, amp, freq, delay, offset);
-%     % 3. Sine sweep
-%     res{end+1} = @(t) sweepsine(t, T, amp(:, 1), freq, offset(:, 1));
+    % 1. Simple periodic
+    res{end+1} = @(t) amp(:, 1) .* ...
+                      cos(2*pi*freq(:, 1)*t + delay(:, 1)) + offset(:, 1);
+    % 2. Multisine
+    res{end+1} = @(t) multisine(t, amp, freq, delay, offset);
+    % 3. Sine sweep
+    res{end+1} = @(t) sweepsine(t, T, amp(:, 1), freq, offset(:, 1));
     % 4. Uniform
     res{end+1} = @(t) amp(:, 1).*rand(r, 1) + offset(:, 1);
-%     % 5. Growing uniform
-%     res{end+1} = @(t) growing(t, T, amp(:, 1), offset(:, 1), r);
-%     % 6. Spiky
-%     res{end+1} = @(t) spiky(t, T, uniformInterval, r);
+    % 5. Growing uniform
+    res{end+1} = @(t) growing(t, T, amp(:, 1), offset(:, 1), r);
+    % 6. Spiky
+    res{end+1} = @(t) spiky(t, T, uniformInterval, r);
 
 %     % uncomment if you need plots
 %     timesteps = 0:0.01:T;
