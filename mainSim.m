@@ -1,6 +1,5 @@
-function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
-                                                T, x0, Q, R, ode, ...
-                                                isPlot, isWarn, imgPath)
+function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
+                            isPlot, isWarn, imgPath)
     arguments
         modelPath
         sysName
@@ -9,13 +8,14 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
         x0 = [-pi/2; -3*pi]  % change it sometime
         Q = 10 * eye(2)
         R = 5
-        ode = @ode45  % flex2link: ode23s faster
+        ode = @ode45         % flex2link: ode15s faster
         isPlot = false
         isWarn = false
         imgPath = 'results/imgs/mainSim/'
     end
 
     % 0.1 Set default values
+    tsFailed = false;  % var for event detection
     if contains(modelPath, 'fis')
         tsModel = readfis(modelPath);
         extendedModel.model = tsModel;
@@ -44,30 +44,22 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
         tsOpt = odeset('RelTol', 5e-3, 'AbsTol', 5e-6); % ode23s (long)
         sdreOpt = odeset('RelTol', 5e-3, 'AbsTol', 5e-6);
     end
-    tsFailed = false;  % var for event detection
-
-%     tsTime = [];
-%     sdreTime = [];
-%     intTime = [];
-
+    
     % 0.2 add calculation of criterion to rhs
     function dXdt = rhsWithCriterion(x, uName, sysName, Q, R, ...
-                                     extendedModel, dt, known)
+                                     extendedModel, dt, known, u0)
         if strcmp(uName, 'tsBased')
-%             tStart = tic;
             [u, ~, ~, errorFlag] = tsBasedControl( ...
                 x, extendedModel, sysName, dt, known, Q, R);
-%             tEnd = toc(tStart);
-%             tsTime = [tsTime; tEnd];
-            tsFailed = or(tsFailed, errorFlag); 
+            if norm(u) > 1.03 * norm(u0)
+                tsFailed = true;
+            else
+                tsFailed = or(tsFailed, errorFlag); 
+            end
         elseif strcmp(uName, 'SDRE')
-%             tStart = tic;
             u = sdre(x, sysName, Q, R);
-%             tEnd = toc(tStart);
-%             sdreTime = [sdreTime; tEnd];
         end
         
-%         tStart = tic;
         if strcmp(sysName, 'motorLink')
             dXdt = sys.rhsMotorLink(x, u);
         elseif strcmp(sysName, 'invPend')
@@ -76,8 +68,6 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
             dXdt = sys.rhsFlex2link(x, u);
         end
         dXdt(end + 1) = x'*Q*x + u'*R*u;
-%         tEnd = toc(tStart);
-%         intTime = [intTime; tEnd];
     end
 
     % 0.3 event detection, event = there is no solution of SDRE
@@ -94,29 +84,34 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
 
     % 1.1 integrate
     timesteps = 0:dt:T;
+    u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R);
     rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
-                                extendedModel, dt, known);
+                                extendedModel, dt, known, u0);
     tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS);
-    tic
+    tsWallTime = tic;
     [t, tsX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], tsOpt);
-    toc
-    rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
+    tsWallTime = toc(tsWallTime);
+    simStats.tsWallTime = tsWallTime;
     if tsFailed
         disp(['TS-based SDRE does not work. x:' num2str(tsX(end, 1:end-1))])
-        disp(['t:' num2str(t(end))])
-        tsCriterion = -1;
-    else
-        tsCriterion = tsX(end, end);
-        disp(['Criterion value of new method: ' num2str(tsCriterion)])
+        disp(['t:' num2str(t(end))])    
     end
-    [~, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
+    simStats.tsTime = t(end);
+    tsCriterion = tsX(end, end);
+    disp(['Criterion value of new method: ' num2str(tsCriterion)])
+    simStats.tsCriterion = tsCriterion;
+    tsX(:, end) = [];   % delete column with criterion values
+    
+    rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
+    sdreWallTime = tic;
+    [t, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
+    sdreWallTime = toc(sdreWallTime);
+    simStats.sdreWallTime = sdreWallTime;
+    simStats.sdreTime = t(end);
     sdreCriterion = sdreX(end, end);
     disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
-    sdreX(:, end) = [];     % delete column with criterion values
-    tsX(:, end) = [];
-    %   dispTime('TS-based control', tsTime)
-    %   dispTime('rhs evaluation', intTime)
-    %   dispTime('SDRE control', sdreTime)
+    simStats.sdreCriterion = sdreCriterion;
+    sdreX(:, end) = [];     
 
     if isPlot    
         % 2.1 Calculate u, estimates(x, f, B) at timesteps
@@ -145,17 +140,17 @@ function [tsCriterion, sdreCriterion] = mainSim(modelPath, sysName, dt, ...
     
         % 2.3 Plot u, estimates and trajectories
         plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, uList)
-        utils.plotEstimates('f', fTrue, fPred, n, timesteps)
+%         utils.plotEstimates('f', fTrue, fPred, n, timesteps)
 %         for k=1:r
 %             utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
 %                                 Bpred(:, :, k), n, timesteps)
 %         end
         if n > 4
             half = floor(n/2);
-            plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
-                           sdreX(1:nSteps, 1:half), tsX(:, 1:half))
-            plotComparison('Trajectories', 'SDRE', half, timesteps, ...
-                           sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
+%             plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
+%                            sdreX(1:nSteps, 1:half), tsX(:, 1:half))
+%             plotComparison('Trajectories', 'SDRE', half, timesteps, ...
+%                            sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
 %             plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
 %                            tsX(:, 1:2), predX(:, 1:2))
 %             plotComparison('Trajectories-Preds', 'TS', 2, timesteps, ...
@@ -196,16 +191,4 @@ function plotComparison(figName, lineName, kStart, timesteps, sdreData, tsData)
     hold off
     ax = gca;
     ax.FontSize = 18;
-end
-
-function dispTime(name, time)
-    minT = round(min(time), 4);
-    maxT = round(max(time), 4);
-    meanT = round(mean(time), 4);
-
-    output = ['Time of ' name ':'];
-    output = [output ' min=' num2str(minT)];
-    output = [output ', max=' num2str(maxT)];
-    output = [output ', mean=' num2str(meanT)];
-    disp(output)
 end

@@ -10,7 +10,7 @@ function testFlex2link(modelPath, q, r)
     Q = q * eye(8);
     R = r * eye(2);
     nTests = length(q1Range) * length(q2Range) * length(z1Range) * length(z2Range);
-    criterion = zeros(nTests, 8+2);
+    criterion = zeros(nTests, 8+6);
     k = 1;
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
@@ -19,14 +19,15 @@ function testFlex2link(modelPath, q, r)
             for z1=z1Range
                 for z2=z2Range
                     x0 = [q1; q2; z1; z2; 0; 0; 0; 0];
-                    tic
-                    [tsCriterion, sdreCriterion] = mainSim( ...
-                        modelPath, 'flex2link', dt, 15, ...
-                        x0, Q, R, @ode15s);
-                    toc
+                    simStats = mainSim(modelPath, 'flex2link', dt, 0.01, ...
+                                       x0, Q, R, @ode15s, false);
                     criterion(k, 1:8) = x0';
-                    criterion(k, 9) = tsCriterion;
-                    criterion(k, 10) = sdreCriterion;
+                    criterion(k, 9) = simStats.tsCriterion;
+                    criterion(k, 10) = simStats.sdreCriterion;
+                    criterion(k, 11) = simStats.tsTime;
+                    criterion(k, 12) = simStats.sdreTime;
+                    criterion(k, 13) = simStats.tsWallTime;
+                    criterion(k, 14) = simStats.sdreWallTime;
                     k = k + 1;
                 end
             end
