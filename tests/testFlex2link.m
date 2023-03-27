@@ -1,4 +1,4 @@
-function testFlex2link(modelPath, q, r)
+function testFlex2link(modelPath, q, r, testT)
     [dt, T, nPoints, reduction] = extractParams(modelPath);
 
     addpath('../')
@@ -19,8 +19,8 @@ function testFlex2link(modelPath, q, r)
             for z1=z1Range
                 for z2=z2Range
                     x0 = [q1; q2; z1; z2; 0; 0; 0; 0];
-                    simStats = mainSim(modelPath, 'flex2link', dt, 0.01, ...
-                                       x0, Q, R, @ode15s, false);
+                    simStats = mainSim(modelPath, 'flex2link', dt, ...
+                                       testT, x0, Q, R, @ode15s, false);
                     criterion(k, 1:8) = x0';
                     criterion(k, 9) = simStats.tsCriterion;
                     criterion(k, 10) = simStats.sdreCriterion;
