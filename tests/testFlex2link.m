@@ -1,38 +1,33 @@
 function testFlex2link(modelPath, q, r, testT)
+% q, r - parameters of the control criterion
     [dt, T, nPoints, reduction] = extractParams(modelPath);
 
     addpath('../')
-    q1Range = -pi:pi/2:pi;
-    q2Range = -pi:pi/2:pi;
+    q1Range = -pi:pi/2:pi; % there is nothing in common between q and q1,q2
+    q2Range = -pi:pi/2:pi; % q1, q2 - angles; 
     z1Range = [-350, 350];
     z2Range = [-250, 250];
+    [q1, q2, z1, z2] = ndgrid(q1Range, q2Range, z1Range, z2Range);
+    nTests = numel(q1);
     
     Q = q * eye(8);
     R = r * eye(2);
-    nTests = length(q1Range) * length(q2Range) * length(z1Range) * length(z2Range);
     criterion = zeros(nTests, 8+6);
-    k = 1;
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
-    for q1=q1Range
-        for q2=q2Range
-            for z1=z1Range
-                for z2=z2Range
-                    x0 = [q1; q2; z1; z2; 0; 0; 0; 0];
-                    simStats = mainSim(modelPath, 'flex2link', dt, ...
-                                       testT, x0, Q, R, @ode15s, false);
-                    criterion(k, 1:8) = x0';
-                    criterion(k, 9) = simStats.tsCriterion;
-                    criterion(k, 10) = simStats.sdreCriterion;
-                    criterion(k, 11) = simStats.tsTime;
-                    criterion(k, 12) = simStats.sdreTime;
-                    criterion(k, 13) = simStats.tsWallTime;
-                    criterion(k, 14) = simStats.sdreWallTime;
-                    k = k + 1;
-                end
-            end
+    tic
+    parfor k=1:nTests
+        x0 = [q1(k); q2(k); z1(k); z2(k); 0; 0; 0; 0];
+        simStats = mainSim(modelPath, 'flex2link', dt, testT, ...
+                           x0, Q, R, @ode15s);
+        simStats = [x0', simStats.tsCriterion, simStats.sdreCriterion, ...
+                    simStats.tsTime, simStats.sdreTime, ...
+                    simStats.tsWallTime, simStats.sdreWallTime];
+        for iStats=1:14
+            criterion(k, iStats) = simStats(iStats);
         end
     end
+    toc
     expName = ['../results/testFlex2link(dt-' num2str(dt) ...
                '_T-' num2str(T) ...
                '_N-' num2str(nPoints) ...
