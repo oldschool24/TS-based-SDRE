@@ -47,15 +47,9 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     
     % 0.2 add calculation of criterion to rhs
     function dXdt = rhsWithCriterion(x, uName, sysName, Q, R, ...
-                                     extendedModel, dt, known, u0)
+                                     extendedModel, dt, known)
         if strcmp(uName, 'tsBased')
-            [u, ~, ~, errorFlag] = tsBasedControl( ...
-                x, extendedModel, sysName, dt, known, Q, R);
-            if norm(u) > 1.03 * norm(u0)
-                tsFailed = true;
-            else
-                tsFailed = or(tsFailed, errorFlag); 
-            end
+            u = tsBasedControl(x, extendedModel, sysName, dt, known, Q, R);
         elseif strcmp(uName, 'SDRE')
             u = sdre(x, sysName, Q, R);
         end
@@ -71,7 +65,14 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     end
 
     % 0.3 event detection, event = there is no solution of SDRE
-    function [condition, isTerminal, direction] = nonvalidTS()
+    function [condition, isTerminal, direction] = nonvalidTS(x)
+        [u, ~, ~, errorFlag] = tsBasedControl(x, extendedModel, ...
+            sysName, dt, known, Q, R);
+        if norm(u) > 2 * norm(u0)
+            tsFailed = true;
+        else
+            tsFailed = or(tsFailed, errorFlag); 
+        end
         condition = 1 - double(tsFailed);
         isTerminal = 1;
         direction = 0;
@@ -86,8 +87,8 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     timesteps = 0:dt:T;
     u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R);
     rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
-                                extendedModel, dt, known, u0);
-    tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS);
+                                extendedModel, dt, known);
+    tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS(x(1:end-1)));
     tsWallTime = tic;
     [t, tsX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], tsOpt);
     tsWallTime = toc(tsWallTime);

@@ -1,27 +1,32 @@
-function estimatesValidation(sysName, dt, isPlot)
+function estimatesValidation(modelPath, trainPath, testPath, dt, isPlot)
     arguments
-        sysName
-        dt double {mustBePositive}
+        modelPath {mustBeText}
+        trainPath {mustBeText}
+        testPath {mustBeText}
+        dt double {mustBePositive} 
         isPlot = true
     end
 
-    if strcmp(sysName, 'invPend')
+    if contains(trainPath, 'invPend')
         n = 4;
         r = 1;
-    elseif strcmp(sysName, 'motorLink')
+        sysName = 'invPend';
+    elseif contains(trainPath, 'motorLink')
         n = 2;
         r = 1;
-    elseif strcmp(sysName, 'flex2link')
+        sysName = 'motorLink';
+    elseif contains(trainPath, 'flex2link')
         n = 8;
         r = 2;
+        sysName = 'flex2link';
     end
 
     % 1. load data and model
-    load(['data/', sysName], 'trainData')
-    xTrain = trainData(:, 1:n);
-    load(['data/', sysName, 'Test'], 'testData')
-    xTest = testData(:, 1:n);
-    load(['models/' sysName '.mat'], 'extendedModel')
+    load(trainPath, 'trainData')
+    xTrain = trainData(:, end-n+1:end);
+    load(testPath, 'testData')
+    xTest = testData(:, end-n+1:end);
+    load(modelPath, "extendedModel")
 
     % 2. predict
     [~, fTrain, fTrainPred, B_Train, B_TrainPred] = utils.logger( ...

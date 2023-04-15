@@ -3,4 +3,7 @@
 *.asv
 
 old_scripts/
+models/
+data/
+results/
 

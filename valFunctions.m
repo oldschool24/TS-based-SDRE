@@ -24,33 +24,33 @@ function res = testFunctions(sysName)
 %                 30, 5, 0.5, 0.05, 0.5];
         delay = zeros(size(freq));
         uniformInterval = zeros(r, 5, 2);
-%         uniformInterval(1, :, :) = [-3  3; 
-%                                     -3  3; 
-%                                     1.5 2.75; 
-%                                   -0.25 0.25;
-%                                   -2.75 -1.5];
-%         uniformInterval(2, :, :) = [-3  3;
-%                                     -3  3; 
-%                                     1.5 2.75; 
-%                                   -0.25 0.25;
-%                                   -2.75 -1.5];
-        uniformInterval(1, :, :) = [-30  30; 
-                                    -30  30; 
-                                     15  21; 
-                                     -3  3;
-                                    -21 -15];
-        uniformInterval(2, :, :) = [-20  20; 
-                                    -20  20; 
-                                     10  14; 
-                                     -2  2;
-                                    -14 -10];
+%         uniformInterval(1, :, :) = [-30  30; 
+%                                     -30  30; 
+%                                      15  21; 
+%                                      -3  3;
+%                                     -21 -15];
+%         uniformInterval(2, :, :) = [-20  20; 
+%                                     -20  20; 
+%                                      10  14; 
+%                                      -2  2;
+%                                     -14 -10];
+        uniformInterval(1, :, :) = [-180  180; 
+                                    -180  180; 
+                                     90   126; 
+                                    -18   18;
+                                    -126 -90];
+        uniformInterval(2, :, :) = [-180  180; 
+                                    -180  180; 
+                                     90   126; 
+                                    -18   18;
+                                    -126 -90];
     end
     amp = (uniformInterval(:, :, 2) - uniformInterval(:, :, 1)) / 2;
     amp = squeeze(amp);
     offset = (uniformInterval(:, :, 1) + uniformInterval(:, :, 2)) / 2;
     offset = squeeze(offset);
 
-    % 1. Simple periodic
+%     % 1. Simple periodic
     res{end+1} = @(t) amp(:, 1) .* ...
                       cos(2*pi*freq(:, 1)*t + delay(:, 1)) + offset(:, 1);
     % 2. Multisine

@@ -15,7 +15,7 @@ function tsIdentification(isLoad, sysName, dt)
                  '_reduct-' num2str(reduction) ...
                  ').mat'];
 
-    dataName = ['data/' modelName];
+    dataName = ['data/train/' modelName];
     if isLoad
         load(dataName, 'trainData')
     else
