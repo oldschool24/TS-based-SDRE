@@ -1,4 +1,4 @@
-function testData = collectTestData(sysName, dt, T, xRange, nPoints, reduction)
+function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
     arguments
         sysName
         dt double {mustBePositive}
