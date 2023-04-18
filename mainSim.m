@@ -1,5 +1,5 @@
 function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
-                            isPlot, isWarn, imgPath)
+                            isPlot, isWarn, verbose, imgPath)
     arguments
         modelPath
         sysName
@@ -11,6 +11,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         ode = @ode45         % flex2link: ode15s faster
         isPlot = false
         isWarn = false
+        verbose = true
         imgPath = 'results/imgs/mainSim/'
     end
 
@@ -92,27 +93,32 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     tsWallTime = tic;
     [t, tsX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], tsOpt);
     tsWallTime = toc(tsWallTime);
-    simStats.tsWallTime = tsWallTime;
-    if tsFailed
-        disp(['TS-based SDRE does not work. x:' num2str(tsX(end, 1:end-1))])
-        disp(['t:' num2str(t(end))])    
-    end
+    simStats.stopPoint = tsX(end, 1:end-1);
     simStats.tsTime = t(end);
     tsCriterion = tsX(end, end);
-    disp(['Criterion value of new method: ' num2str(tsCriterion)])
-    simStats.tsCriterion = tsCriterion;
     tsX(:, end) = [];   % delete column with criterion values
     
     rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
     sdreWallTime = tic;
     [t, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
     sdreWallTime = toc(sdreWallTime);
-    simStats.sdreWallTime = sdreWallTime;
     simStats.sdreTime = t(end);
     sdreCriterion = sdreX(end, end);
-    disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
-    simStats.sdreCriterion = sdreCriterion;
     sdreX(:, end) = [];     
+
+    simStats.tsWallTime = tsWallTime;
+    simStats.tsCriterion = tsCriterion;
+    simStats.sdreWallTime = sdreWallTime;
+    simStats.sdreCriterion = sdreCriterion;
+
+    if verbose
+        if tsFailed
+            disp(['TS-based SDRE does not work. x:' num2str(simStats.stopPoint)])
+            disp(['t:' num2str(simStats.tsTime)])    
+        end
+        disp(['Criterion value of new method: ' num2str(tsCriterion)])
+        disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
+    end
 
     if isPlot    
         % 2.1 Calculate u, estimates(x, f, B) at timesteps

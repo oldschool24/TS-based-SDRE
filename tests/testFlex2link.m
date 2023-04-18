@@ -12,7 +12,7 @@ function testFlex2link(modelPath, q, r, testT)
     
     Q = q * eye(8);
     R = r * eye(2);
-    criterion = zeros(nTests, 8+6);
+    criterion = zeros(nTests, 8+6+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     tic
@@ -22,8 +22,9 @@ function testFlex2link(modelPath, q, r, testT)
                            x0, Q, R, @ode15s);
         simStats = [x0', simStats.tsCriterion, simStats.sdreCriterion, ...
                     simStats.tsTime, simStats.sdreTime, ...
-                    simStats.tsWallTime, simStats.sdreWallTime];
-        for iStats=1:14
+                    simStats.tsWallTime, simStats.sdreWallTime, ...
+                    simStats.stopPoint];
+        for iStats=1:22
             criterion(k, iStats) = simStats(iStats);
         end
     end
