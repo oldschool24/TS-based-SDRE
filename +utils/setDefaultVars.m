@@ -29,31 +29,23 @@ elseif strcmp(sysName, 'invPend')
     T = 1;
     nPoints = 200;
 elseif strcmp(sysName, 'flex2link')
-    r = 2;
-    n = 8;
-%         uRange = [-211 -615; 
-%                    254  608];
-%     xRange = [-pi, -pi, -30, -70, -5*pi, -5*pi, -150, -700;  % real
-%                pi,  pi,  30,  70,  5*pi,  5*pi,  150,  700];
-    xRange = [-20, -20, -700, -500, -7*pi, -9*pi, -4*10^4, -4*10^4; 
-               20,  20,  700,  500,  7*pi,  9*pi,  4*10^4,  4*10^4];
+    config = jsondecode(fileread(configPath));
+    nPoints = config.nPoints;
+    T = config.T;
+    uRange = config.uRange;
+    reduction = config.reduction;
+    xRange = config.xRange;
+    withPI = config.withPI;
+    xIdxPI = config.xIdxPI;
+    uIdxPI = config.uIdxPI;
+    Kp = config.Kp;
+    Ki = config.Ki;
+    Kd = config.Kd;
+    isNormalize = config.isNormalize;
+    r = config.r;
+    n = config.n;
+
     x0 = zeros(n, 1);
-    isNormalize = false;
-
-    uRange = [-120 -300;  
-               120  300];
-%     x0Range = [-pi/2, -pi/2, -pi/2, -pi/2, -pi, -pi, -pi, -pi; 
-%                 pi/2,  pi/2,  pi/2,  pi/2,  pi,  pi,  pi,  pi];
-    reduction = 0.7;
-    T = 1;         % dt = 0.01 => 1
-    nPoints = 100;   % dt = 0.01 => 300
-
-    withPI = true;
-    xIdxPI = [1, 2];
-    uIdxPI = [1, 2];
-    Kp = [-220; -120];
-    Ki = [7; 4];
-    Kd = [-0.6; 0.01]; 
 end
 
 x0Range = utils.reduceRange(xRange, reduction);

@@ -1,4 +1,4 @@
-function tsIdentification(isLoad, sysName, dt)
+function tsIdentification(isLoad, sysName, dt, configPath)
 % identification of TS fuzzy model based on IO data
 % x(k+1) ~ f(x(k), u(k)); 
 % isLoad: 1, if load dataset; 0 if create
@@ -6,6 +6,7 @@ function tsIdentification(isLoad, sysName, dt)
         isLoad {mustBeNumericOrLogical}
         sysName
         dt double {mustBePositive}
+        configPath = ''
     end
     
     utils.setDefaultVars;
