@@ -9,6 +9,7 @@ function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
         reduction = 0.05
     end
     
+    rng(1, 'twister')   % for reproducibility
     if strcmp(sysName, 'motorLink')
         r = 1;
         rhs = @sys.rhsMotorLink;
@@ -23,7 +24,7 @@ function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
         wrapper = @sys.flex2linkWrapper;
     end
 
-    uTest = testFunctions(sysName); % test control functions
+    uTest = valFunctions(sysName); % test control functions
     nTests = length(uTest);
 
     [~, n] = size(xRange);
