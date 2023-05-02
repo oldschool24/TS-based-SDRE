@@ -1,4 +1,4 @@
-function res = testFunctions(sysName)
+function res = valFunctions(sysName)
     res = {};
     if strcmp(sysName, 'motorLink')
         r = 1;
@@ -20,20 +20,8 @@ function res = testFunctions(sysName)
         T = 10;
         freq = [30, 10, 5, 0.5, 5;
                 30, 10, 5, 0.5, 5];
-%         freq = [30, 5, 0.5, 0.05, 0.5;
-%                 30, 5, 0.5, 0.05, 0.5];
         delay = zeros(size(freq));
         uniformInterval = zeros(r, 5, 2);
-%         uniformInterval(1, :, :) = [-30  30; 
-%                                     -30  30; 
-%                                      15  21; 
-%                                      -3  3;
-%                                     -21 -15];
-%         uniformInterval(2, :, :) = [-20  20; 
-%                                     -20  20; 
-%                                      10  14; 
-%                                      -2  2;
-%                                     -14 -10];
         uniformInterval(1, :, :) = [-180  180; 
                                     -180  180; 
                                      90   126; 

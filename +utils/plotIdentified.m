@@ -26,7 +26,7 @@ function plotIdentified(sysName, extendedModel, T, dt, x0)
 
     timesteps = 0:dt:T;
     nSteps = length(timesteps);    
-    uTest = testFunctions(sysName);
+    uTest = valFunctions(sysName);
     nTests = length(uTest);
     X_true = zeros(nTests, nSteps, n);
     for iTest=1:nTests

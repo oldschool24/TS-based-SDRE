@@ -1,22 +1,17 @@
-function tsIdentification(isLoad, sysName, dt, configPath)
+function tsIdentification(configPath)
 % identification of TS fuzzy model based on IO data
 % x(k+1) ~ f(x(k), u(k)); 
-% isLoad: 1, if load dataset; 0 if create
     arguments
-        isLoad {mustBeNumericOrLogical}
-        sysName
-        dt double {mustBePositive}
         configPath = ''
     end
     
     utils.setDefaultVars;
-    modelName = [sysName '(not-dt-' num2str(dt) ...
-                 '_T-' num2str(T) ...
-                 '_N-' num2str(nPoints) ...
-                 '_reduct-' num2str(reduction) ...
-                 ').mat'];
+    
+    expPath = fullfile('runs', expName);
+    mkdir(expPath)
+    copyfile(configPath, fullfile(expPath, 'trainData.json'))
 
-    dataName = ['data/train/' modelName];
+    dataName = fullfile(expPath, 'trainData');
     if isLoad
         load(dataName, 'trainData')
     else
@@ -69,7 +64,7 @@ function tsIdentification(isLoad, sysName, dt, configPath)
     extendedModel.thenParams = thenParams;
 
     % 3. save
-    modelName = ['models/' modelName];
+    modelName = fullfile(expPath, 'model');
     extendedModel.model = tsModel;
     extendedModel.range = utils.getTsRange(tsModel, n);
     if isNormalize
@@ -80,7 +75,6 @@ function tsIdentification(isLoad, sysName, dt, configPath)
         extendedModel.normS = [];
     end
     save(modelName, "extendedModel")
-    % writeFIS(extendedModel, modelName)
 
     % 4. plot and compare
 %     tic

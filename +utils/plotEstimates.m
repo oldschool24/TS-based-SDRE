@@ -1,8 +1,8 @@
-function plotEstimates(name, data, pred, n, timesteps, figName)
+function plotEstimates(name, data, pred, n, timesteps, figName, imgDir)
     if nargin == 6
-        figure('Name', figName)
+        estFigure = figure('Name', figName);
     else
-        figure()
+        estFigure = figure();
     end
     nLines = ceil(n/2);
     nColumns = 2;
@@ -13,5 +13,10 @@ function plotEstimates(name, data, pred, n, timesteps, figName)
         title([name '_' num2str(k)], 'FontSize', 20)
         ax = gca;
         ax.FontSize = 18;
+    end
+    if nargin == 7
+        estFigure.Position = [0, 0, 1920, 1080];
+        imgPath = fullfile(imgDir, [figName '.png']);
+        exportgraphics(estFigure, imgPath, 'Resolution', 300);
     end
 end

@@ -1,5 +1,5 @@
 function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
-                            isPlot, isWarn, verbose, imgPath)
+                            imgDir, isWarn, verbose)
     arguments
         modelPath
         sysName
@@ -9,10 +9,9 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         Q = 10 * eye(2)
         R = 5
         ode = @ode45         % flex2link: ode15s faster
-        isPlot = false
+        imgDir = ''
         isWarn = false
         verbose = true
-        imgPath = 'results/imgs/mainSim/'
     end
 
     % 0.1 Set default values
@@ -69,7 +68,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     function [condition, isTerminal, direction] = nonvalidTS(x)
         [u, ~, ~, errorFlag] = tsBasedControl(x, extendedModel, ...
             sysName, dt, known, Q, R);
-        if norm(u) > 2 * norm(u0)
+        if norm(u) > 1.03 * norm(u0)
             tsFailed = true;
         else
             tsFailed = or(tsFailed, errorFlag); 
@@ -120,7 +119,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
     end
 
-    if isPlot    
+    if ~isempty(imgDir)    
         % 2.1 Calculate u, estimates(x, f, B) at timesteps
         [uList, fTrue, fPred, Btrue, Bpred] = utils.logger( ...
             sysName, tsX, r, extendedModel, dt);
@@ -146,37 +145,28 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         predX(1, :) = tsX(1, :);
     
         % 2.3 Plot u, estimates and trajectories
-        plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, uList)
-%         utils.plotEstimates('f', fTrue, fPred, n, timesteps)
-%         for k=1:r
-%             utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
-%                                 Bpred(:, :, k), n, timesteps)
-%         end
-        if n > 4
-            half = floor(n/2);
-%             plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
-%                            sdreX(1:nSteps, 1:half), tsX(:, 1:half))
-%             plotComparison('Trajectories', 'SDRE', half, timesteps, ...
-%                            sdreX(1:nSteps, half+1:n), tsX(:, half+1:n))
-%             plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
-%                            tsX(:, 1:2), predX(:, 1:2))
-%             plotComparison('Trajectories-Preds', 'TS', 2, timesteps, ...
-%                            tsX(:, 3:4), predX(:, 3:4))
-%             plotComparison('Trajectories-Preds', 'TS', 4, timesteps, ...
-%                            tsX(:, 5:6), predX(:, 5:6))
-%             plotComparison('Trajectories-Preds', 'TS', 6, timesteps, ...
-%                            tsX(:, 7:8), predX(:, 7:8))
-        else
-            plotComparison('Trajectories', 'SDRE', 0, timesteps, ...
-                           sdreX(1:nSteps, 1:n), tsX(:, 1:n))
-            plotComparison('Trajectories-Preds', 'TS', 0, timesteps, ...
-                           tsX(:, 1:n), predX(:, 1:n))
+        plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, ...
+                       uList, imgDir)
+        utils.plotEstimates('f', fTrue, fPred, n, timesteps, ...
+                            'f', imgDir)
+        for k=1:r
+            utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
+                                Bpred(:, :, k), n, timesteps, ...
+                                ['B_' num2str(k)], imgDir)
         end
-        % saveas(gcf, [imgPath sysName '-traj-' num2str(x0')], 'png')
+        for k=1:2:n
+            plotComparison(['Trajectories-', num2str(k)], 'SDRE', ...
+                           k-1, timesteps, sdreX(1:nSteps, [k, k+1]), ...
+                           tsX(:, [k, k+1]), imgDir)
+            plotComparison(['Trajectories-Preds-' num2str(k)], 'TS', ...
+                           k-1, timesteps, tsX(:, [k, k+1]), ...
+                           predX(:, [k, k+1]), imgDir)
+        end
     end
 end
 
-function plotComparison(figName, lineName, kStart, timesteps, sdreData, tsData)
+function plotComparison(figName, lineName, kStart, timesteps, ...
+                        sdreData, tsData, imgDir)
     figure('Name', figName)
     if strcmp(figName, 'Controls')
         varName = 'u';
@@ -198,4 +188,5 @@ function plotComparison(figName, lineName, kStart, timesteps, sdreData, tsData)
     hold off
     ax = gca;
     ax.FontSize = 18;
+    exportgraphics(gca, fullfile(imgDir, [figName '.png']))
 end
