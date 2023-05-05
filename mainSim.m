@@ -1,5 +1,5 @@
 function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
-                            imgDir, isWarn, verbose)
+                            isWrap, imgDir, known, isWarn, verbose)
     arguments
         modelPath
         sysName
@@ -9,7 +9,9 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         Q = 10 * eye(2)
         R = 5
         ode = @ode45         % flex2link: ode15s faster
+        isWrap = false
         imgDir = ''
+        known = []
         isWarn = false
         verbose = true
     end
@@ -30,17 +32,14 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         wrapper = @(x) x;
         n = 2;
         r = 1;
-        known = [];
     elseif strcmp(sysName, 'invPend')
         wrapper = @sys.invPendWrapper;
         n = 4;
         r = 1;
-        known = [];
     elseif strcmp(sysName, 'flex2link')
         wrapper = @sys.flex2linkWrapper;
         n = 8;
         r = 2;
-        known = [];
         tsOpt = odeset('RelTol', 5e-3, 'AbsTol', 5e-6); % ode23s (long)
         sdreOpt = odeset('RelTol', 5e-3, 'AbsTol', 5e-6);
     end
@@ -49,7 +48,8 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     function dXdt = rhsWithCriterion(x, uName, sysName, Q, R, ...
                                      extendedModel, dt, known)
         if strcmp(uName, 'tsBased')
-            u = tsBasedControl(x, extendedModel, sysName, dt, known, Q, R);
+            u = tsBasedControl(x, extendedModel, sysName, dt, known, ...
+                               Q, R, isWrap);
         elseif strcmp(uName, 'SDRE')
             u = sdre(x, sysName, Q, R);
         end
@@ -66,8 +66,8 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
 
     % 0.3 event detection, event = there is no solution of SDRE
     function [condition, isTerminal, direction] = nonvalidTS(x)
-        [u, ~, ~, errorFlag] = tsBasedControl(x, extendedModel, ...
-            sysName, dt, known, Q, R);
+        [u, ~, ~, errorFlag] = tsBasedControl( ...
+            x, extendedModel, sysName, dt, known, Q, R, isWrap);
         if norm(u) > 1.03 * norm(u0)
             tsFailed = true;
         else
@@ -85,7 +85,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
 
     % 1.1 integrate
     timesteps = 0:dt:T;
-    u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R);
+    u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R, isWrap);
     rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
                                 extendedModel, dt, known);
     tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS(x(1:end-1)));
@@ -122,7 +122,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     if ~isempty(imgDir)    
         % 2.1 Calculate u, estimates(x, f, B) at timesteps
         [uList, fTrue, fPred, Btrue, Bpred] = utils.logger( ...
-            sysName, tsX, r, extendedModel, dt);
+            sysName, tsX, r, extendedModel, dt, known, Q, R, isWrap);
         [nSteps, ~] = size(tsX);
         sdreList = zeros(nSteps, r);    % SDRE values at timesteps
         for iStep=1:nSteps
@@ -135,11 +135,14 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         tsModel = extendedModel.model;
         modelRange = extendedModel.range;
         for iStep=1:nSteps
-            tsX(iStep, :) = wrapper(tsX(iStep, :));
-            sdreX(iStep, :) = wrapper(sdreX(iStep, :));
             if iStep > 1
                 predX(iStep, :) = utils.evalProjection( ...
-                    tsModel, [tsX(iStep-1, :), uList(iStep-1, :)], modelRange);
+                    tsModel, [tsX(iStep-1, :), uList(iStep-1, :)], ...
+                    modelRange, isWrap, sysName);
+            end
+            if isWrap
+                tsX(iStep, :) = wrapper(tsX(iStep, :));
+                sdreX(iStep, :) = wrapper(sdreX(iStep, :));
             end
         end
         predX(1, :) = tsX(1, :);

@@ -20,17 +20,17 @@ function tsIdentification(configPath)
         if withPI   
 %             % trajectory -> ss-model -> PI-control -> dataset 
 %             trainData = utils.collectData(sysName, x0Grid(1, :), xRange, ...
-%                 uRange'/10, T, dt, r, []);
+%                 uRange'/10, T, dt, r, [], isWrap);
 %             % automatic search of Kp, Ki (not reliable)
 %             [Kp, Ki] = utils.buildPI(trainData, xIdxPI, uIdxPI, dt, n);
 
             pidCoefs = struct('Kp', Kp, 'Ki', Ki, 'Kd', Kd, ...
                 'xIdxPI', xIdxPI, 'uIdxPI', uIdxPI);
             trainData = utils.collectData(sysName, x0Grid(2:end, :), ...
-                xRange, uRange, T, dt, r, pidCoefs);
+                xRange, uRange, T, dt, r, pidCoefs, isWrap);
         else
             trainData = utils.collectData(sysName, x0Grid, xRange, ...
-                uRange', T, dt, r, []);
+                uRange', T, dt, r, [], isWrap);
         end
         if isNormalize
             [trainData, normC, normS] = normalize( ...
@@ -78,7 +78,7 @@ function tsIdentification(configPath)
 
     % 4. plot and compare
 %     tic
-%     utils.plotIdentified(sysName, extendedModel, 5, dt, x0)
+%     utils.plotIdentified(sysName, extendedModel, 5, dt, x0, isWrap)
 %     toc
 end
 

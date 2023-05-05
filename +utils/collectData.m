@@ -1,10 +1,9 @@
 function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
-    dt, r, pidCoefs)
+    dt, r, pidCoefs, isWrap)
 % create simulated data for TS model identification
     
     if strcmp(sysName, 'motorLink')
         rhs = @sys.rhsMotorLink;
-        wrapper = @(x) x;
         expAlpha = -2;
         trainParams = reshape(uRange', 1, [], 2);
     elseif strcmp(sysName, 'invPend')
@@ -19,6 +18,9 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
 %                     -2];
         expAlpha = [];
         trainParams = reshape(uRange', 2, [], 2);
+    end
+    if ~isWrap
+        wrapper = @(x) x;
     end
 
     if ~isempty(pidCoefs)

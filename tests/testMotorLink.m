@@ -4,6 +4,8 @@ thetaRange = -pi/2:pi/9:pi/2;
 thetadotRange = -pi/2:pi/9:pi/2;
 Q = 5*eye(2);
 R = 10;
+isWrap = false;
+known = [];
 
 nTests = length(thetaRange) * length(thetadotRange);
 criterion = zeros(nTests, 2);  % 1st column - ts-based SDRE, 2nd - SDRE
@@ -14,9 +16,9 @@ warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
 for theta=thetaRange
     for thetadot=thetadotRange
         tic
-        [tsCriterion, sdreCriterion] = mainSim(@sys.rhsMotorLink, ...
-            dt, 10, readfis('../models/motorLink.fis'), ...
-            [theta; thetadot], Q, R);
+        [tsCriterion, sdreCriterion] = mainSim( ...
+            '../models/motorLink.fis', 'motorLink', dt, 10, ...
+            [theta; thetadot], Q, R, @ode15s, isWrap, '', known);
         toc
         criterion(k, 1) = tsCriterion;
         criterion(k, 2) = sdreCriterion;

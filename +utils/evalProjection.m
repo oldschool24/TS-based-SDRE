@@ -1,8 +1,16 @@
 function [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring] = evalProjection( ...
-    tsModel, input, modelRange)
+    tsModel, input, modelRange, isWrap, sysName)
 % extended evalfis: works even outside the modelRange
     [~, n] = size(modelRange);
-    projection = zeros(size(input));
+    if isWrap
+        if strcmp(sysName, 'invPend') 
+            projection = sys.invPendWrapper(x);
+        elseif strcmp(sysName, 'flex2link')
+            projection = sys.flex2linkWrapper(x);
+        end
+    else
+        projection = zeros(size(input));
+    end
     for k=1:n
         if input(k) < modelRange(1, k)
             projection(k) = modelRange(1, k);

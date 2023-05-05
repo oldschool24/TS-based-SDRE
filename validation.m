@@ -9,6 +9,7 @@ function validation(valConfigPath, isPlot)
     r = trainConfig.r;
     sysName = trainConfig.sysName;
     dt = trainConfig.dt;
+    isWrap = trainConfig.isWrap;
 
     if isempty(valConfig.valDataName)
         T = valConfig.T;
@@ -16,13 +17,15 @@ function validation(valConfigPath, isPlot)
         nPoints = valConfig.nPoints;
         reduction = valConfig.reduction;
         valData = utils.collectValData(sysName, dt, T, xRange, ...
-                                       nPoints, reduction);
+                                       nPoints, reduction, isWrap);
         valPath = fullfile('data', valConfig.expName, 'data');
         mkdir(fullfile('data', valConfig.expName))
         save(valPath, 'valData')
     else
         valPath = fullfile('data', valConfig.valDataName, 'data');
     end
+    Q = valConfig.qCriterion * eye(n);
+    R = valConfig.rCriterion * eye(r);
 
     % 1. load model and data
     load(fullfile(expPath, 'model'), "extendedModel")
@@ -34,12 +37,14 @@ function validation(valConfigPath, isPlot)
     modelRange = extendedModel.range;
 
     % 2. predict
-    xTrainPred = modelPrediction(trainData(:, 1:n+r), tsModel, modelRange);
-    xPred = modelPrediction(valData(:, 1:n+r), tsModel, modelRange);
+    xTrainPred = modelPrediction(trainData(:, 1:n+r), tsModel, ...
+                                 modelRange, isWrap, sysName);
+    xPred = modelPrediction(valData(:, 1:n+r), tsModel, ...
+                            modelRange, isWrap, sysName);
     [~, f_train, f_trainPred, B_train, B_trainPred] = utils.logger( ...
-                                     sysName, xTrain, r, extendedModel, dt);
-    [~, f_val, f_pred, B_val, B_pred] = utils.logger(sysName, xVal, ...
-                                                     r, extendedModel, dt);
+        sysName, xTrain, r, extendedModel, dt, [], Q, R, isWrap);
+    [~, f_val, f_pred, B_val, B_pred] = utils.logger( ...
+        sysName, xVal, r, extendedModel, dt, [], Q, R, isWrap);
     
     % 3. calculate metrics
     ts_results = calcMetrics(xVal, xPred, xTrain, xTrainPred);
@@ -73,7 +78,7 @@ function validation(valConfigPath, isPlot)
     end
 end
 
-function yPred = modelPrediction(y, tsModel, modelRange)
+function yPred = modelPrediction(y, tsModel, modelRange, isWrap, sysName)
     [nSamples, ~] = size(y);
     [~, n] = size(modelRange);
 
@@ -81,7 +86,7 @@ function yPred = modelPrediction(y, tsModel, modelRange)
     yPred(1, :) = y(1, 1:n);
     for iSample=2:nSamples
         yPred(iSample, :) = utils.evalProjection( ...
-            tsModel, y(iSample-1, :)', modelRange);
+            tsModel, y(iSample-1, :)', modelRange, isWrap, sysName);
     end
 end
 

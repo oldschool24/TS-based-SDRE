@@ -1,4 +1,5 @@
-function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
+function testData = collectValData(sysName, dt, T, xRange, nPoints, ...
+                                   reduction, isWrap)
     arguments
         sysName
         dt double {mustBePositive}
@@ -7,13 +8,13 @@ function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
                    6,  pi/2,  12,  10]
         nPoints = 10
         reduction = 0.05
+        isWrap = false
     end
     
     rng(1, 'twister')   % for reproducibility
     if strcmp(sysName, 'motorLink')
         r = 1;
         rhs = @sys.rhsMotorLink;
-        wrapper = @(x) x;
     elseif strcmp(sysName, 'invPend')
         r = 1;
         rhs = @sys.rhsInvPend;
@@ -22,6 +23,9 @@ function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
         r = 2;
         rhs = @sys.rhsFlex2link;
         wrapper = @sys.flex2linkWrapper;
+    end
+    if ~isWrap
+        wrapper = @(x) x;
     end
 
     uTest = valFunctions(sysName); % test control functions
@@ -52,9 +56,9 @@ function testData = collectValData(sysName, dt, T, xRange, nPoints, reduction)
             % save data from simulation
             nSteps = length(t);
             for iStep=2:nSteps
-                testData(iData+iStep-1, 1:n) = wrapper(X(iStep-1, :)');
+                testData(iData+iStep-1, 1:n) = X(iStep-1, :)';
                 testData(iData+iStep-1, n+1:n+r) = uList(:, iStep-1);
-                testData(iData+iStep-1, r+n+1:end) = wrapper(X(iStep, :)');
+                testData(iData+iStep-1, r+n+1:end) = X(iStep, :)';
             end
             iData = iData + (nSteps - 1);
         end

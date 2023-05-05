@@ -1,5 +1,5 @@
 function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
-    x, extendedModel, sysName, dt, known, Q, R)
+    x, extendedModel, sysName, dt, known, Q, R, isWrap)
 % this function finds SDRE-control based on tsModel, x - state vector
     arguments
         x
@@ -9,20 +9,18 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         known = []
         Q = []
         R = []
+        isWrap = false
     end
 
     % 1. Set default values
     errorFlag = false;
     if strcmp(sysName, 'motorLink')
-        wrapped_x = x;
         n = 2;
         r = 1;
     elseif strcmp(sysName, 'invPend') 
-        wrapped_x = sys.invPendWrapper(x);
         n = 4;
         r = 1;
     elseif strcmp(sysName, 'flex2link')
-        wrapped_x = sys.flex2linkWrapper(x);
         n = 8;
         r = 2;
     end
@@ -32,9 +30,9 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     normC = extendedModel.normC;
     normS = extendedModel.normS;
     if ~isempty(normC) && ~isempty(normS)
-        wrapped_x = normalize(wrapped_x', 2, ...
+        x = normalize(x', 2, ...
             'center', normC(1:n), 'scale', normS(1:n));
-        wrapped_x = wrapped_x';
+        x = x';
     end
     if isempty(Q)
         Q = 10 * eye(n);
@@ -49,7 +47,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     waveA = zeros(n, n);
     waveB = zeros(n, r);
     [~, ~, ~, ~, ruleFiring] = utils.evalProjection( ...
-        tsModel, [wrapped_x; zeros(r, 1)], modelRange);
+        tsModel, [x; zeros(r, 1)], modelRange, isWrap, sysName);
     
     ruleFiring = ruleFiring / sum(ruleFiring);
     % column <-> component of state vector:

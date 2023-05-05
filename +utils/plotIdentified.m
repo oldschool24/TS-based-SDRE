@@ -1,4 +1,4 @@
-function plotIdentified(sysName, extendedModel, T, dt, x0)
+function plotIdentified(sysName, extendedModel, T, dt, x0, isWrap)
     if strcmp(sysName, 'motorLink')
         rhs = @sys.rhsMotorLink;
         wrapper = @(x) x;
@@ -11,7 +11,7 @@ function plotIdentified(sysName, extendedModel, T, dt, x0)
         rhs = @sys.rhsFlex2link;
         wrapper = @sys.flex2linkWrapper;
         r = 2;
-    end
+    end 
 
     n = length(x0);
     if isempty(extendedModel.normC) || isempty(extendedModel.normS)
@@ -37,8 +37,10 @@ function plotIdentified(sysName, extendedModel, T, dt, x0)
         u = @(t) ppval(pp, t);  
         % collect true answers
         [~, X] = ode45(@(t, x) rhs(x, u(t)), timesteps, x0);
-        for iStep=1:nSteps
-            X(iStep, :) = wrapper(X(iStep, :));
+        if isWrap
+            for iStep=1:nSteps
+                X(iStep, :) = wrapper(X(iStep, :));
+            end
         end
         if isNormalize
             X = normalize(X, 'center', xNormC, 'scale', xNormS);
@@ -68,10 +70,14 @@ function plotIdentified(sysName, extendedModel, T, dt, x0)
             else
                 inp = [X(iStep-1, :)'; u(timesteps(iStep-1))];
             end
-            X_pred(iTest, iStep, :) = utils.evalProjection(tsModel, inp, ...
-                                                           modelRange);
+            X_pred(iTest, iStep, :) = utils.evalProjection( ...
+                tsModel, inp, modelRange, isWrap, sysName);
         end
-        [~, f, fHat, B, Bhat] = utils.logger(sysName, X, r, extendedModel, dt);
+        % known = [], Q = 10 * eye(n), R = 5 * eye(r)
+        [~, f, fHat, B, Bhat] = utils.logger( ...
+            sysName, X, r, extendedModel, dt, [], [], [], isWrap);
+
+        % sysName, X, r, extendedModel, dt, known, Q, R, isWrap)
         fTrue(iTest, :, :) = f;
         fPred(iTest, :, :) = fHat;
         Btrue(iTest, :, :, :) = B;

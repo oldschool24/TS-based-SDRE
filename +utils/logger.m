@@ -1,5 +1,6 @@
-function [uList, fTrue, fPred, Btrue, Bpred] = logger(sysName, X, r, ...
-                                                      extendedModel, dt)    
+function [uList, fTrue, fPred, Btrue, Bpred] = logger( ...
+    sysName, X, r, extendedModel, dt, known, Q, R, isWrap)
+
     [nSteps, n] = size(X);
     uList = zeros(nSteps, r);
     fTrue = zeros(nSteps, n);
@@ -8,7 +9,8 @@ function [uList, fTrue, fPred, Btrue, Bpred] = logger(sysName, X, r, ...
     Bpred = zeros(nSteps, n, r);
     for iStep=1:nSteps
         x = X(iStep, :)';
-        [u, fHat, Bhat] = tsBasedControl(x, extendedModel, sysName, dt);
+        [u, fHat, Bhat] = tsBasedControl(x, extendedModel, sysName, ...
+                                         dt, known, Q, R, isWrap);
         uList(iStep, :) = u;
         fPred(iStep, :) = fHat;
         Bpred(iStep, :, :) = Bhat;

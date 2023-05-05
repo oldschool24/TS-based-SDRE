@@ -12,8 +12,10 @@ function testFlex2link(testConfigPath)
     z2Range = testConfig.z2Range;
     q = testConfig.q;  % q, r - parameters of the control criterion
     r = testConfig.r;
+    known = testConfig.known;
     modelPath = fullfile(expPath, 'model.mat');
     dt = trainConfig.dt;
+    isWrap = trainConfig.isWrap;
     T = testConfig.T;
     nExamples = testConfig.nExamples;
 
@@ -37,7 +39,7 @@ function testFlex2link(testConfigPath)
             imgDir = '';
         end
         simStats = mainSim(modelPath, 'flex2link', dt, T, ...
-                           x0, Q, R, @ode15s, imgDir);
+                           x0, Q, R, @ode15s, isWrap, imgDir, known);
         simStats = [x0', simStats.tsCriterion, simStats.sdreCriterion, ...
                     simStats.tsTime, simStats.sdreTime, ...
                     simStats.tsWallTime, simStats.sdreWallTime, ...
