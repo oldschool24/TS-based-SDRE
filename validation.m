@@ -37,6 +37,8 @@ function validation(valConfigPath, isPlot)
     modelRange = extendedModel.range;
 
     % 2. predict
+    warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
+    warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     xTrainPred = modelPrediction(trainData(:, 1:n+r), tsModel, ...
                                  modelRange, isWrap, sysName);
     xPred = modelPrediction(valData(:, 1:n+r), tsModel, ...

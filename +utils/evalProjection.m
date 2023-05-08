@@ -4,13 +4,12 @@ function [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring] = evalProjection(
     [~, n] = size(modelRange);
     if isWrap
         if strcmp(sysName, 'invPend') 
-            projection = sys.invPendWrapper(input);
+            input = sys.invPendWrapper(input);
         elseif strcmp(sysName, 'flex2link')
-            projection = sys.flex2linkWrapper(input);
+            input = sys.flex2linkWrapper(input);
         end
-    else
-        projection = zeros(size(input));
     end
+    projection = zeros(size(input));
     for k=1:n
         if input(k) < modelRange(1, k)
             projection(k) = modelRange(1, k);
