@@ -1,5 +1,5 @@
 function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
-                            isWrap, imgDir, known, isWarn, verbose)
+                            isWrap, imgDir, known, isAnalyze, isWarn, verbose)
     arguments
         modelPath
         sysName
@@ -12,6 +12,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         isWrap = false
         imgDir = ''
         known = []
+        isAnalyze = false
         isWarn = false
         verbose = true
     end
@@ -119,9 +120,9 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
     end
 
-    if ~isempty(imgDir)    
+    if or(~isempty(imgDir), isAnalyze)
         % 2.1 Calculate u, estimates(x, f, B) at timesteps
-        [uList, fTrue, fPred, Btrue, Bpred] = utils.logger( ...
+        [uList, f_true, f_pred, B_true, B_pred] = utils.logger( ...
             sysName, tsX, r, extendedModel, dt, known, Q, R, isWrap);
         [nSteps, ~] = size(tsX);
         sdreList = zeros(nSteps, r);    % SDRE values at timesteps
@@ -140,22 +141,35 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
                     tsModel, [tsX(iStep-1, :), uList(iStep-1, :)], ...
                     modelRange, isWrap, sysName);
             end
-            if isWrap
-                tsX(iStep, :) = wrapper(tsX(iStep, :));
-                sdreX(iStep, :) = wrapper(sdreX(iStep, :));
-            end
         end
         predX(1, :) = tsX(1, :);
-    
+    end
+
+    if isAnalyze
+        simStats.tsX = tsX;
+        simStats.predX = predX;
+        simStats.f_true = f_true;
+        simStats.f_pred = f_pred; 
+        simStats.B_true = B_true; 
+        simStats.B_pred = B_pred;
+    end
+
+    if ~isempty(imgDir)
         % 2.3 Plot u, estimates and trajectories
         plotComparison('Controls', 'SDRE', 0, timesteps, sdreList, ...
                        uList, imgDir)
-        utils.plotEstimates('f', fTrue, fPred, n, timesteps, ...
+        utils.plotEstimates('f', f_true, f_pred, n, timesteps, ...
                             'f', imgDir)
         for k=1:r
-            utils.plotEstimates(['B^' num2str(k)], Btrue(:, :, k), ...
-                                Bpred(:, :, k), n, timesteps, ...
+            utils.plotEstimates(['B^' num2str(k)], B_true(:, :, k), ...
+                                B_pred(:, :, k), n, timesteps, ...
                                 ['B_' num2str(k)], imgDir)
+        end
+        if isWrap
+            for iStep=1:nSteps
+                tsX(iStep, :) = wrapper(tsX(iStep, :));
+                sdreX(iStep, :) = wrapper(sdreX(iStep, :));
+            end
         end
         for k=1:2:n
             plotComparison(['Trajectories-', num2str(k)], 'SDRE', ...

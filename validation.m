@@ -26,6 +26,7 @@ function validation(valConfigPath, isPlot)
     end
     Q = valConfig.qCriterion * eye(n);
     R = valConfig.rCriterion * eye(r);
+    isAnalyze = valConfig.isAnalyze;
 
     % 1. load model and data
     load(fullfile(expPath, 'model'), "extendedModel")
@@ -61,7 +62,7 @@ function validation(valConfigPath, isPlot)
     save(fullfile(expPath, 'f'), "f_results")
     save(fullfile(expPath, 'B'), "B_results")
 
-    % 4. Plot
+    % 4. Plots: error(t)
     if isPlot
         [nSamplesTrain, ~] = size(xTrain);
         [nSamplesVal, ~] = size(xVal);
@@ -77,6 +78,25 @@ function validation(valConfigPath, isPlot)
                             1:nSamplesTrain, 'B on train')
         utils.plotEstimates('B', B_val, B_pred, n, ...
                             1:nSamplesVal, 'B on test')
+    end
+
+    % 5. Plots: error(x)
+    if isAnalyze
+        % 5.1 On train
+        analyzeDir = fullfile(expPath, "trainAnalysis");
+        if ~exist(analyzeDir, 'dir')
+            mkdir(analyzeDir)
+        end
+        utils.wrapperStats(sysName, xTrain, xTrainPred, f_train, ...
+                           f_trainPred, B_train, B_trainPred, analyzeDir)
+        
+        % 5.2 On validation
+        analyzeDir = fullfile(expPath, "valAnalysis");
+        if ~exist(analyzeDir, 'dir')
+            mkdir(analyzeDir)
+        end
+        utils.wrapperStats(sysName, xVal, xPred, f_val, f_pred, ...
+                           B_val, B_pred, analyzeDir)
     end
 end
 
