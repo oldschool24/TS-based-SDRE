@@ -1,10 +1,13 @@
 function testFlex2link(testConfigPath)
     testConfig = jsondecode(fileread(testConfigPath));
     expPath = fullfile('../runs', testConfig.expName);
-    [~, testConfigName, ~] = fileparts(testConfigPath);
-    copyfile(testConfigPath, fullfile(expPath, [testConfigName '.json']))
     trainConfigPath = fullfile(expPath, 'trainData.json');
     trainConfig = jsondecode(fileread(trainConfigPath));
+
+    [~, testConfigName, ~] = fileparts(testConfigPath);
+    folderName = createFolder(expPath, testConfigName);
+    folderPath = fullfile(expPath, folderName);
+    copyfile(testConfigPath, fullfile(folderPath, 'test.json'))
 
     q1Range = testConfig.q1Range;
     q2Range = testConfig.q2Range;
@@ -29,7 +32,7 @@ function testFlex2link(testConfigPath)
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     tic
-    parfor k=1:nTests
+    for k=1:nTests
         x0 = [q1(k); q2(k); z1(k); z2(k); 0; 0; 0; 0];
         if ismember(k, idxExamples)
             imgDir = fullfile( ...
@@ -48,5 +51,33 @@ function testFlex2link(testConfigPath)
             criterion(k, iStats) = simStats(iStats);
         end
     end
-    save(fullfile(expPath, testConfigName), 'criterion')
+    save(fullfile(folderPath, 'test'), 'criterion')
+end
+
+function res = createFolder(expPath, folderName)
+    if ~exist(fullfile(expPath, folderName), 'dir')
+        % Folder doesn't exist, create it
+        mkdir(fullfile(expPath, folderName));
+        res = folderName;
+    else
+        % Folder already exists, find the highest numbered folder
+        existingFolders = dir([fullfile(expPath, folderName) '*']);
+        highestNumber = 1;
+        for k = 1:length(existingFolders)
+            folder = existingFolders(k).name;
+            % Extract the number from the folder name
+            [~, name, ext] = fileparts(folder);
+            if strcmp(ext, '') && startsWith(name, folderName + "_")
+                numberStr = extractAfter(name, length(folderName) + 1);
+                number = str2double(numberStr);
+                if ~isnan(number) && number > highestNumber
+                    highestNumber = number;
+                end
+            end
+        end
+        % Create the new folder with the incremented number
+        newFolderName = [folderName '_' num2str(highestNumber + 1)];
+        mkdir(fullfile(expPath, newFolderName));
+        res = newFolderName;
+    end
 end

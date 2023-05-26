@@ -46,8 +46,10 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     %    tsModel(x(k), u(k)) = waveA * x(k) + waveB * u(k)
     waveA = zeros(n, n);
     waveB = zeros(n, r);
-    [~, ~, ~, ~, ruleFiring] = utils.evalProjection( ...
+    [~, ~, ~, ~, ruleFiring, pure, processed] = utils.evalProjection( ...
         tsModel, [x; zeros(r, 1)], modelRange, isWrap, sysName);
+    x_pure = pure(1:n);  % before wrapper, after projection
+    x_processed = processed(1:n);  % after wrapper and projection
     
     ruleFiring = ruleFiring / sum(ruleFiring);
     % column <-> component of state vector:
@@ -65,15 +67,20 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     end
 
     % 3. Calculate hatA, hatB: estimates of A(x), B(x)
-    hatA = 1/dt * (waveA - eye(n));
+    if isWrap
+        usual_f_hat = 1/dt * (waveA - eye(n)) * x_processed;
+        hatA = diag(usual_f_hat ./ x_pure);
+    else
+        hatA = 1/dt * (waveA - eye(n));
+    end
     hatB = 1/dt * waveB;
     if ~isempty(known)
-        A = sys.get_A(x, sysName);
-        B = sys.get_B(x, sysName);  
+        A = sys.get_A(x_pure, sysName);
+        B = sys.get_B(x_pure, sysName);  
         hatA(known, :) = A(known, :);
         hatB(known, :) = B(known, :);
     end
-    fHat = hatA * x;
+    fHat = hatA * x;  % TODO: x_pure instead x?
 
     % 4. Calculate u = SDRE(hatA, hatB)
     P = icare(hatA, hatB, Q, R);
@@ -82,6 +89,6 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         u = zeros(r, 1);
         errorFlag = true;
     else
-        u = -inv(R) * hatB' * P * x;
+        u = -inv(R) * hatB' * P * x;  % TODO: x_pure instead x?
     end
 end
