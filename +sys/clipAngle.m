@@ -1,11 +1,18 @@
-function clipped = clipAngle(angle)
+function [clipped, rotations] = clipAngle(angles)
 % clip angle to [-pi, pi]
-    if (angle > pi) || (angle < -pi)
-        clipped = angle - 2*pi*floor(angle/(2*pi));
-        if abs(clipped) > pi
-            clipped = clipped - sign(clipped)*(2*pi);
+    clipped = zeros(length(angles), 1);
+    rotations = zeros(length(angles), 1);
+    for iAngles=1:length(angles)
+        angle = angles(iAngles);
+        if (angle > pi) || (angle < -pi)
+            distance = abs(angle - sign(angle)*pi);
+            rotation = sign(angle) * ceil(distance / (2*pi));
+            newValue = angle - (2*pi)*rotation;
+        else
+            newValue = angle;
+            rotation = 0;
         end
-    else
-        clipped = angle;
+        clipped(iAngles) = newValue;
+        rotations(iAngles) = rotation;
     end
 end
