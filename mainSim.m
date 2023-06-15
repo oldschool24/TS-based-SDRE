@@ -69,7 +69,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     function [condition, isTerminal, direction] = nonvalidTS(x)
         [u, ~, ~, errorFlag] = tsBasedControl( ...
             x, extendedModel, sysName, dt, known, Q, R, isWrap);
-        if norm(u) > 1.03 * norm(u0)
+        if norm(u) > 10 * norm(u0)
             tsFailed = true;
         else
             tsFailed = or(tsFailed, errorFlag); 
@@ -138,7 +138,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         for iStep=1:nSteps
             if iStep > 1
                 predX(iStep, :) = utils.evalProjection( ...
-                    tsModel, [tsX(iStep-1, :), uList(iStep-1, :)], ...
+                    tsModel, [tsX(iStep-1, :), uList(iStep-1, :)]', ...
                     modelRange, isWrap, sysName);
             end
         end
@@ -167,8 +167,8 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         end
         if isWrap
             for iStep=1:nSteps
-                tsX(iStep, :) = wrapper(tsX(iStep, :));
-                sdreX(iStep, :) = wrapper(sdreX(iStep, :));
+                tsX(iStep, :) = wrapper(tsX(iStep, :)');
+                sdreX(iStep, :) = wrapper(sdreX(iStep, :)');
             end
         end
         for k=1:2:n

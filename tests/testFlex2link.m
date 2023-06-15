@@ -30,27 +30,27 @@ function testFlex2link(testConfigPath)
     Q = q * eye(8);
     R = r * eye(2);
     if isAnalyze
-        tsX = [];
-        predX = [];
-        f_true = [];
-        f_pred = []; 
-        B_true = []; 
-        B_pred = [];
         analyzeDir = fullfile(expPath, "testAnalysis");
         if ~exist(analyzeDir, 'dir')
             mkdir(analyzeDir)
         end
     end
+    tsX = [];
+    predX = [];
+    f_true = [];
+    f_pred = []; 
+    B_true = []; 
+    B_pred = [];
 
     criterion = zeros(nTests, 8+6+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     tic
-    for k=1:nTests
+    parfor k=1:nTests
         x0 = [q1(k); q2(k); z1(k); z2(k); 0; 0; 0; 0];
         if ismember(k, idxExamples)
             imgDir = fullfile( ...
-                expPath, ['example_' testConfigName '(' num2str(k) ')']);
+                folderPath, ['example_' num2str(k)]);
             if ~exist(imgDir, "dir")
                 mkdir(imgDir)
             end
@@ -76,7 +76,7 @@ function testFlex2link(testConfigPath)
         end
     end
     
-    save(fullfile(expPath, testConfigName), 'criterion')
+    save(fullfile(folderPath, testConfigName), 'criterion')
     if isAnalyze
         utils.wrapperStats('flex2link', tsX, predX, f_true, f_pred, ...
                            B_true, B_pred, analyzeDir)

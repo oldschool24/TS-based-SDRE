@@ -66,7 +66,7 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
             nSteps = length(t);
             trajsLen(iPoint, iControl) = nSteps;
             for iStep=1:nSteps
-                X(iStep, :) = wrapper(X(iStep, :));
+                X(iStep, :) = wrapper(X(iStep, :)')';
             end
 
             % 2. Save data from simulation
@@ -94,7 +94,7 @@ function dataset = collectData(sysName, x0Grid, xRange, uRange, T, ...
                     I = X(iStep, n+k);
                     uList(iStep, uIdxPI(k)) = Kp(k)*err + Ki(k)*I;
                 end
-                X(iStep, :) = wrapper(X(iStep, :));
+                X(iStep, :) = wrapper(X(iStep, :)')';
             end
             X(:, end-r+1 : end) = [];
 
