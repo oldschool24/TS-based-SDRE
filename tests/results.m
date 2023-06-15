@@ -7,7 +7,7 @@ function res = results(mat_path)
 
     % TODO: new tests for invPend, motorLink
     % success, if integration with TS-control stopped after SDRE
-    indSucceed = criterion(:, end-3) >= criterion(:, end-2);
+    indSucceed = criterion(:, 11) >= criterion(:, 12);
     
     newCriterion = criterion(indSucceed, :);
     nSucceed = sum(indSucceed);
