@@ -4,9 +4,9 @@ function [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring, pure, processed] 
     
     if isWrap
         if strcmp(sysName, 'invPend') 
-            wrapped = sys.invPendWrapper(input);
+            [wrapped, periods] = sys.invPendWrapper(input);
         elseif strcmp(sysName, 'flex2link')
-            wrapped = sys.flex2linkWrapper(input);
+            [wrapped, periods] = sys.flex2linkWrapper(input);
         end
     end
     
@@ -38,4 +38,5 @@ function [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring, pure, processed] 
 
     [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring] = evalfis( ...
         tsModel, processed);
+    output = output + periods';
 end
