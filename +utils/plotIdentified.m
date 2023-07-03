@@ -75,7 +75,7 @@ function plotIdentified(sysName, extendedModel, T, dt, x0, isWrap)
         end
         % known = [], Q = 10 * eye(n), R = 5 * eye(r)
         [~, f, fHat, B, Bhat] = utils.logger( ...
-            sysName, X, r, extendedModel, dt, [], [], [], isWrap);
+            sysName, X, r, extendedModel, dt, [], [], [], isWrap, true);
 
         % sysName, X, r, extendedModel, dt, known, Q, R, isWrap)
         fTrue(iTest, :, :) = f;

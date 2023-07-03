@@ -123,7 +123,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     if or(~isempty(imgDir), isAnalyze)
         % 2.1 Calculate u, estimates(x, f, B) at timesteps
         [uList, f_true, f_pred, B_true, B_pred] = utils.logger( ...
-            sysName, tsX, r, extendedModel, dt, known, Q, R, isWrap);
+            sysName, tsX, r, extendedModel, dt, known, Q, R, isWrap, false);
         [nSteps, ~] = size(tsX);
         sdreList = zeros(nSteps, r);    % SDRE values at timesteps
         for iStep=1:nSteps

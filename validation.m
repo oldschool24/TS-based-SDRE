@@ -1,4 +1,4 @@
-function validation(valConfigPath, isPlot)
+function validation(valConfigPath, isPlot, isFast)
     % 0. load settings
     valConfig = jsondecode(fileread(valConfigPath));
     expPath = fullfile('runs', valConfig.expName);
@@ -31,23 +31,39 @@ function validation(valConfigPath, isPlot)
     % 1. load model and data
     load(fullfile(expPath, 'model'), "extendedModel")
     load(fullfile(expPath, 'trainData'), 'trainData')
-    xTrain = trainData(:, end-n+1:end);
     load(valPath, 'valData')
+    if isFast  % use only 25% of data
+        trainData = trainData(1:4:end, :);  
+        valData = valData(1:4:end, :);
+%         nSamples = min(size(trainData, 1), size(valData, 1));
+%         nSamples = min(nSamples, 100000);
+%         trainData = trainData(1:nSamples, :);
+%         valData = valData(1:nSamples, :);
+    end
+    xTrain = trainData(:, end-n+1:end);
     xVal = valData(:, end-n+1:end);
     tsModel = extendedModel.model;
     modelRange = extendedModel.range;
 
     % 2. predict
+    % turn off warnings
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+    parfevalOnAll(@warning,0,'off','fuzzy:general:warnEvalfis_NoRuleFired');
+    parfevalOnAll(@warning,0,'off','fuzzy:general:diagEvalfis_OutOfRangeInput');
+    % predictions
     xTrainPred = modelPrediction(trainData(:, 1:n+r), tsModel, ...
                                  modelRange, isWrap, sysName);
+    disp('Prediction on the training data is done')
     xPred = modelPrediction(valData(:, 1:n+r), tsModel, ...
                             modelRange, isWrap, sysName);
+    disp('Prediction on the validation data is done')
     [~, f_train, f_trainPred, B_train, B_trainPred] = utils.logger( ...
-        sysName, xTrain, r, extendedModel, dt, [], Q, R, isWrap);
+        sysName, xTrain, r, extendedModel, dt, [], Q, R, isWrap, true);
+    disp('Estimates on the training data are calculated')
     [~, f_val, f_pred, B_val, B_pred] = utils.logger( ...
-        sysName, xVal, r, extendedModel, dt, [], Q, R, isWrap);
+        sysName, xVal, r, extendedModel, dt, [], Q, R, isWrap, true);
+    disp('Estimates on the validation data are calculated')
     
     % 3. calculate metrics
     ts_results = calcMetrics(xVal, xPred, xTrain, xTrainPred);
@@ -103,13 +119,19 @@ end
 function yPred = modelPrediction(y, tsModel, modelRange, isWrap, sysName)
     [nSamples, ~] = size(y);
     [~, n] = size(modelRange);
-
     yPred = zeros(nSamples, n);
     yPred(1, :) = y(1, 1:n);
-    for iSample=2:nSamples
+    parfor iSample=2:nSamples
         yPred(iSample, :) = utils.evalProjection( ...
             tsModel, y(iSample-1, :)', modelRange, isWrap, sysName);
     end
+%     tic 
+%     yCell = mat2cell(y(1:end-1, :), ones(nSamples-1, 1));
+%     yPred = cellfun(@(x) utils.evalProjection(tsModel, x', modelRange, ...
+%                                               isWrap, sysName), ...
+%                     yCell, 'UniformOutput', false);
+%     yPred = cell2mat([{y(1, 1:n)}; yPred]);
+%     toc
 end
 
 function res = calcMetrics(yVal, yPred, yTrain, yTrainPred)
