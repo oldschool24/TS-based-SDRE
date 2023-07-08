@@ -69,7 +69,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     function [condition, isTerminal, direction] = nonvalidTS(x)
         [u, ~, ~, errorFlag] = tsBasedControl( ...
             x, extendedModel, sysName, dt, known, Q, R, isWrap);
-        if norm(u) > 10 * norm(u0)
+        if norm(u) > 1.03 * norm(u0)
             tsFailed = true;
         else
             tsFailed = or(tsFailed, errorFlag); 

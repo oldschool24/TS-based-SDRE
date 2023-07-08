@@ -38,5 +38,7 @@ function [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring, pure, processed] 
 
     [output,fuzzifiedIn,ruleOut,aggregatedOut,ruleFiring] = evalfis( ...
         tsModel, processed);
-    output = output + periods';
+    if isWrap
+        output = output + periods';
+    end
 end

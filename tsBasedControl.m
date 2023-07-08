@@ -79,7 +79,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB);
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
     end
-    fHat = hatA * x;  % TODO: x_pure instead x?
+    fHat = hatA * x_pure;
 
     % 4. Calculate u = SDRE(hatA, hatB)
     if isempty(P)
