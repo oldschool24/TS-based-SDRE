@@ -38,6 +38,9 @@ function tsIdentification(configPath)
         end
         save(dataName, 'trainData')
     end
+    if nPeriod > 0
+        trainData = utils.periodicalRepeat(trainData, nPeriod, sysName);
+    end
 
     % 1. identify number of rules and antecedents params: x(k+1) ~ f(x(k))
     opt = genfisOptions(method); 
