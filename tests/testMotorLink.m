@@ -6,6 +6,8 @@ Q = 5*eye(2);
 R = 10;
 isWrap = false;
 known = [];
+stopType = testConfig.stopType;
+xRange = testConfig.xRange;
 
 nTests = length(thetaRange) * length(thetadotRange);
 criterion = zeros(nTests, 2);  % 1st column - ts-based SDRE, 2nd - SDRE
@@ -18,7 +20,8 @@ for theta=thetaRange
         tic
         [tsCriterion, sdreCriterion] = mainSim( ...
             '../models/motorLink.fis', 'motorLink', dt, 10, ...
-            [theta; thetadot], Q, R, @ode15s, isWrap, '', known);
+            [theta; thetadot], Q, R, stopType, xRange, @ode15s, ...
+            isWrap, '', known);
         toc
         criterion(k, 1) = tsCriterion;
         criterion(k, 2) = sdreCriterion;

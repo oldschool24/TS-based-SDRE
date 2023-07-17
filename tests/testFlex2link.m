@@ -22,6 +22,8 @@ function testFlex2link(testConfigPath)
     T = testConfig.T;
     nExamples = testConfig.nExamples;
     isAnalyze = testConfig.isAnalyze;
+    stopType = testConfig.stopType;
+    xRange = testConfig.xRange;
 
     addpath('../')
     [q1, q2, z1, z2] = ndgrid(q1Range, q2Range, z1Range, z2Range);
@@ -35,6 +37,8 @@ function testFlex2link(testConfigPath)
             mkdir(analyzeDir)
         end
     end
+    xRange(1, 1:2) = -inf;
+    xRange(2, 1:2) = inf;
     tsX = [];
     predX = [];
     f_true = [];
@@ -42,12 +46,15 @@ function testFlex2link(testConfigPath)
     B_true = []; 
     B_pred = [];
 
-    criterion = zeros(nTests, 8+6+8);
+    criterion = zeros(nTests, 8+7+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
+    warning('off','all') %%%%%%%%%%%%%%%%%%%%%%
     tic
-    parfor k=1:nTests
-        x0 = [q1(k); q2(k); z1(k); z2(k); 0; 0; 0; 0];
+%     for k=1:nTests
+    idxExamples = 51;
+    for k=51:51
+        x0 = [q1(k); q2(k); z1(k); z2(k); 0.001; 0.001; 0.001; 0.001]; %%%%%%%%%%%%%%%%%%%%%%
         if ismember(k, idxExamples)
             imgDir = fullfile( ...
                 folderPath, ['example_' num2str(k)]);
@@ -58,14 +65,17 @@ function testFlex2link(testConfigPath)
             imgDir = '';
         end
         simStats = mainSim(modelPath, 'flex2link', dt, T, x0, Q, R, ...
-                           @ode15s, isWrap, imgDir, known, isAnalyze);
+                           stopType, xRange, @ode15s, isWrap, ...
+                           imgDir, known, isAnalyze);
         mainStats = [x0', simStats.tsCriterion, simStats.sdreCriterion, ...
+                     simStats.insideEpsTube, ...
                      simStats.tsTime, simStats.sdreTime, ...
                      simStats.tsWallTime, simStats.sdreWallTime, ...
                      simStats.stopPoint];
-        for iStats=1:22
-            criterion(k, iStats) = mainStats(iStats);
-        end
+        criterion(k, :) = mainStats;
+%         for iStats=1:23
+%             criterion(k, iStats) = mainStats(iStats);
+%         end
         if isAnalyze
             tsX = [tsX; simStats.tsX]; 
             predX = [predX; simStats.predX]; 

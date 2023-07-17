@@ -1,5 +1,6 @@
-function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
-                            isWrap, imgDir, known, isAnalyze, isWarn, verbose)
+function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
+                            xRange, ode, isWrap, imgDir, known, ...
+                            isAnalyze, isWarn, verbose)
     arguments
         modelPath
         sysName
@@ -8,6 +9,8 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
         x0 = [-pi/2; -3*pi]  % change it sometime
         Q = 10 * eye(2)
         R = 5
+        stopType = 'trajectory'
+        xRange = [-inf, -10*pi; inf, 10*pi]
         ode = @ode45         % flex2link: ode15s faster
         isWrap = false
         imgDir = ''
@@ -18,7 +21,6 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     end
 
     % 0.1 Set default values
-    tsFailed = false;  % var for event detection
     if contains(modelPath, 'fis')
         tsModel = readfis(modelPath);
         extendedModel.model = tsModel;
@@ -69,14 +71,14 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     function [condition, isTerminal, direction] = nonvalidTS(x)
         [u, ~, ~, errorFlag] = tsBasedControl( ...
             x, extendedModel, sysName, dt, known, Q, R, isWrap);
-        if norm(u) > 1.03 * norm(u0)
-            tsFailed = true;
-        else
-            tsFailed = or(tsFailed, errorFlag); 
+        if strcmp(stopType, 'trajectory')
+            [condition, isTerminal, direction] = stopDueTraj(x, xRange);
+        elseif strcmp(stopType, 'control')
+            [condition, isTerminal, direction] = stopDueControl(u, u0);
         end
-        condition = 1 - double(tsFailed);
-        isTerminal = 1;
-        direction = 0;
+        condition = [condition; 1-double(errorFlag)];
+        isTerminal = [isTerminal; 1];
+        direction = [direction; 0];
     end
 
     if ~isWarn
@@ -86,7 +88,21 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
 
     % 1.1 integrate
     timesteps = 0:dt:T;
-    u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R, isWrap);
+    rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
+    global w_alpha;
+    w_alpha = ones(n^2, 1) / n;
+%     w_alpha = [zeros(8, 1); 1];
+    
+    sdreWallTime = tic;
+    [t, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
+    sdreWallTime = toc(sdreWallTime);
+    simStats.sdreTime = t(end);
+    sdreCriterion = sdreX(end, end);
+    sdreX(:, end) = [];   
+
+    if strcmp(stopType, 'control')
+        u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R, isWrap);
+    end
     rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
                                 extendedModel, dt, known);
     tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS(x(1:end-1)));
@@ -97,22 +113,15 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
     simStats.tsTime = t(end);
     tsCriterion = tsX(end, end);
     tsX(:, end) = [];   % delete column with criterion values
-    
-    rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
-    sdreWallTime = tic;
-    [t, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
-    sdreWallTime = toc(sdreWallTime);
-    simStats.sdreTime = t(end);
-    sdreCriterion = sdreX(end, end);
-    sdreX(:, end) = [];     
 
+    simStats.insideEpsTube = insideEpsTube(tsX, sdreX);
     simStats.tsWallTime = tsWallTime;
     simStats.tsCriterion = tsCriterion;
     simStats.sdreWallTime = sdreWallTime;
     simStats.sdreCriterion = sdreCriterion;
 
     if verbose
-        if tsFailed
+        if simStats.tsTime < simStats.sdreTime
             disp(['TS-based SDRE does not work. x:' num2str(simStats.stopPoint)])
             disp(['t:' num2str(simStats.tsTime)])    
         end
@@ -179,6 +188,31 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, ode, ...
                            k-1, timesteps, tsX(:, [k, k+1]), ...
                            predX(:, [k, k+1]), imgDir)
         end
+    end
+end
+
+function [condition, isTerminal, direction] = stopDueTraj(x, xRange)
+    [condition, isTerminal, direction] = utils.xRangeEvent(x, xRange);
+end
+
+function [condition, isTerminal, direction] = stopDueControl(u, u0)
+    if norm(u) > 1.03 * norm(u0)
+        condition = 0;
+    else
+        condition = 1;
+    end
+    isTerminal = 1;
+    direction = 0;
+end
+
+function isInside = insideEpsTube(tsX, sdreX)
+    eps = max(abs(sdreX(ceil(end/2):end, :)));
+    
+    % light version
+    if all(tsX(end, :) > -eps) && all(tsX(end, :) < eps)
+        isInside = true;
+    else
+        isInside = false;
     end
 end
 

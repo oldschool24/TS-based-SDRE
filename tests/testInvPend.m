@@ -8,6 +8,8 @@ Q = 5*eye(4);
 R = 5;
 isWrap = true;
 known = [];
+stopType = testConfig.stopType;
+% xRange = testConfig.xRange;
 
 nTests = length(xRange) * length(thetaRange) * length(xdotRange) * length(thetadotRange);
 criterion = zeros(nTests, 2);  % 1st column - ts-based SDRE, 2nd - SDRE
@@ -21,8 +23,8 @@ for x=xRange
                 tic
                 [tsCriterion, sdreCriterion] = mainSim( ...
                     '../models/invPend.fis', 'invPend', dt, 10, ...
-                    [x; theta; xdot; thetadot], Q, R, @ode15s, isWrap, ...
-                    '', known);
+                    [x; theta; xdot; thetadot], Q, R,  stopType, [], ...
+                    @ode15s, isWrap, '', known);
                 toc
                 criterion(k, 1) = tsCriterion;
                 criterion(k, 2) = sdreCriterion;
