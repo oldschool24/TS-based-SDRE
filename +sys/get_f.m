@@ -60,8 +60,11 @@ function f = get_f(x, sysName)
              + 102010*x(5)^2*cos(x(2))*sin(x(2)) + 51005*x(6)^2*cos(x(2))*sin(x(2)) ...
              + 102010*x(5)*x(6)*cos(x(2))*sin(x(2)) ...
             );
-        % case k=10^3 (comment if want k=10^4)
-        f(7) = f(7) / 10;
-        f(8) = f(8) / 10;
+%         % case k=10^3 (comment if want k=10^4)
+%         f(7) = f(7) / 10;
+%         f(8) = f(8) / 10;
+        % case k=10^2 (comment if want k=10^4)
+        f(7) = f(7) / 100;
+        f(8) = f(8) / 100;
     end
 end

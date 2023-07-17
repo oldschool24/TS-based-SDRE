@@ -3,7 +3,7 @@ function dXdt = rhsFlex2link(x, u)
         x (8, 1)   % [q_1; q_2; z_1; z_2; dot(q_1); ...; dot(z_2)]
         u (2, 1)
     end
-    k = 10^(3);   % default: 10^4
+    k = 10^(2);   % default: 10^4
     mu = 1/k;
 
     M = [9.77 + 2.02*cos(x(2)), 1.26 + 1.01*cos(x(2));

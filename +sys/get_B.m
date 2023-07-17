@@ -12,11 +12,15 @@ function B = get_B(x, sysName)
              (I + m * l^2) / denominator; m*l*cos(x(2)) / denominator];
     elseif strcmp(sysName, 'flex2link')
         B = zeros(8, 2);
-        % case k=10^3
-        B(7, 1) = -10000;
-        B(8, 2) = -10000;       
-%         % case k=10^4
-%         B(7, 1) = -100000;
-%         B(8, 2) = -100000;
+        
+        % case k=10^4
+        B(7, 1) = -100000;
+        B(8, 2) = -100000;
+%         % case k=10^3
+%         B(7, 1) = B(7, 1) / 10;
+%         B(8, 2) = B(8, 2) / 10;       
+        % case k=10^2
+        B(7, 1) = B(7, 1) / 100;
+        B(8, 2) = B(8, 2) / 100; 
     end
 end
