@@ -23,8 +23,10 @@ function res = results(mat_path)
     res = zeros(5, 1);
     res(1) = 100 * nSucceed / nPoints; % success rate
     % criterion(:, end-5) contains tsCriterion values, end-4: sdreCriterion
-    relative = 100 * (newCriterion(:, end-5) - newCriterion(:, end-4)) ...
-        ./ newCriterion(:, end-4);
+    % criterion(:, 9) contains tsCriterion values, 10: sdreCriterion
+    % TODO: change for invPend, motorLink
+    relative = 100 * (newCriterion(:, 9) - newCriterion(:, 10)) ...
+        ./ newCriterion(:, 10);
     
     [res(2), ind] = min(relative);
     disp(['best point for TS-based: ' ...

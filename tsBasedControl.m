@@ -76,7 +76,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
 %         stabilizable(hatA, hatB) && detectable(hatA, sqrtm(Q))  % check
     else
         hatA = 1/dt * (waveA - eye(n));
-%         hatA = weightedA(dt, waveA, x_pure, 'perElement');
+%         hatA = weightedA(dt, waveA, x_pure, 'perMatrix');
         [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB);
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
     end
@@ -135,6 +135,7 @@ end
 function hatA = weightedA(dt, waveA, x, type)
     n = numel(x);
     fHat = 1/dt * (waveA-eye(n)) * x;
+    global w_alpha; % [zeros(n, 1); 1]
     
     if strcmp(type, 'perMatrix')
         candidates = zeros(n, n, n+1);
@@ -151,6 +152,9 @@ function hatA = weightedA(dt, waveA, x, type)
         beq = 1;
         lb = zeros(n+1, 1);  % 0 <= w <= 1
         ub = ones(n+1, 1);
+        if isempty(w_alpha)
+            w_alpha = [zeros(n, 1); 1];
+        end
     elseif strcmp(type, 'perElement')
         candidates = fHat ./ x';  % a_ij = f_i / x_j
         [ii, jj] = find(isinf(candidates));
@@ -163,9 +167,11 @@ function hatA = weightedA(dt, waveA, x, type)
         lb = zeros(n^2, 1);
         ub = ones(n^2, 1);
 %         ub(linIdxs) = 0;
+        if isempty(w_alpha)
+            w_alpha = ones(n^2, 1) / n;
+        end
     end
    
-    global w_alpha; % [zeros(n, 1); 1]
     wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type), ...
                   w_alpha, [], [], Aeq, beq, lb, ub, [], ...
                   optimoptions('fmincon', 'Display', 'off', ...

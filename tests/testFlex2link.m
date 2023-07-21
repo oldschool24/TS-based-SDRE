@@ -25,8 +25,20 @@ function testFlex2link(testConfigPath)
     stopType = testConfig.stopType;
     xRange = testConfig.xRange;
 
+
     addpath('../')
-    [q1, q2, z1, z2] = ndgrid(q1Range, q2Range, z1Range, z2Range);
+    if isempty(z1Range) || isempty(z2Range)
+        [q1, q2] = ndgrid(q1Range, q2Range);
+        z1 = zeros(size(q1));
+        z2 = zeros(size(q1));
+        for k=1:numel(q1)
+            G = rhsG([q1(k) q2(k)]);
+            z1(k) = -G(1);
+            z2(k) = -G(2);
+        end
+    else
+        [q1, q2, z1, z2] = ndgrid(q1Range, q2Range, z1Range, z2Range);
+    end
     nTests = numel(q1);
     idxExamples = randsample(nTests, nExamples);
     Q = q * eye(8);
@@ -49,12 +61,12 @@ function testFlex2link(testConfigPath)
     criterion = zeros(nTests, 8+7+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
-    warning('off','all') %%%%%%%%%%%%%%%%%%%%%%
+    warning('off', 'all')
     tic
-%     for k=1:nTests
-    idxExamples = 51;
-    for k=51:51
-        x0 = [q1(k); q2(k); z1(k); z2(k); 0.001; 0.001; 0.001; 0.001]; %%%%%%%%%%%%%%%%%%%%%%
+    parfor k=1:nTests
+%     idxExamples = 1;
+%     for k=idxExamples:idxExamples
+        x0 = [q1(k); q2(k); z1(k); z2(k); 0; 0; 0; 0]; 
         if ismember(k, idxExamples)
             imgDir = fullfile( ...
                 folderPath, ['example_' num2str(k)]);
@@ -68,14 +80,11 @@ function testFlex2link(testConfigPath)
                            stopType, xRange, @ode15s, isWrap, ...
                            imgDir, known, isAnalyze);
         mainStats = [x0', simStats.tsCriterion, simStats.sdreCriterion, ...
-                     simStats.insideEpsTube, ...
                      simStats.tsTime, simStats.sdreTime, ...
                      simStats.tsWallTime, simStats.sdreWallTime, ...
+                     simStats.insideEpsTube, ...
                      simStats.stopPoint];
         criterion(k, :) = mainStats;
-%         for iStats=1:23
-%             criterion(k, iStats) = mainStats(iStats);
-%         end
         if isAnalyze
             tsX = [tsX; simStats.tsX]; 
             predX = [predX; simStats.predX]; 
@@ -119,4 +128,9 @@ function res = createFolder(expPath, folderName)
         mkdir(fullfile(expPath, newFolderName));
         res = newFolderName;
     end
+end
+
+function G = rhsG(q)
+    G = [79.38*sin(q(1)) + 11.074*sin(q(1)+q(2)); 
+         11.074*sin(q(1)+q(2))];
 end
