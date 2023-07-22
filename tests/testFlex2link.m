@@ -58,7 +58,7 @@ function testFlex2link(testConfigPath)
     B_true = []; 
     B_pred = [];
 
-    criterion = zeros(nTests, 8+7+8);
+    testStats = zeros(nTests, 8+7+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     warning('off', 'all')
@@ -79,12 +79,11 @@ function testFlex2link(testConfigPath)
         simStats = mainSim(modelPath, 'flex2link', dt, T, x0, Q, R, ...
                            stopType, xRange, @ode15s, isWrap, ...
                            imgDir, known, isAnalyze);
-        mainStats = [x0', simStats.tsCriterion, simStats.sdreCriterion, ...
-                     simStats.tsTime, simStats.sdreTime, ...
-                     simStats.tsWallTime, simStats.sdreWallTime, ...
-                     simStats.insideEpsTube, ...
-                     simStats.stopPoint];
-        criterion(k, :) = mainStats;
+        testStats(k, :) = [
+            x0', simStats.tsCriterion, simStats.sdreCriterion, ...
+            simStats.tsTime, simStats.sdreTime, ...
+            simStats.tsWallTime, simStats.sdreWallTime, ...
+            simStats.insideEpsTube, simStats.stopPoint];
         if isAnalyze
             tsX = [tsX; simStats.tsX]; 
             predX = [predX; simStats.predX]; 
@@ -94,8 +93,11 @@ function testFlex2link(testConfigPath)
             B_pred = [B_pred; simStats.B_pred]; 
         end
     end
-    
-    save(fullfile(folderPath, testConfigName), 'criterion')
+
+    testStats = table2map(testStats);
+    save(fullfile(folderPath, testConfigName), 'testStats')
+    printResults(testStats)
+
     if isAnalyze
         utils.wrapperStats('flex2link', tsX, predX, f_true, f_pred, ...
                            B_true, B_pred, analyzeDir)
@@ -133,4 +135,32 @@ end
 function G = rhsG(q)
     G = [79.38*sin(q(1)) + 11.074*sin(q(1)+q(2)); 
          11.074*sin(q(1)+q(2))];
+end
+
+function map = updateMap(map, key, idx, value)
+    arr = map(key);
+    arr(idx, :) = value;
+    map(key) = arr;
+end
+
+function map=table2map(table)
+    [nTests, ~] = size(table);
+    map = containers.Map( ...
+        {'x0', 'tsCriterion', 'sdreCriterion', 'tsTime', 'sdreTime', ...
+        'tsWallTime', 'sdreWallTime', 'insideEpsTube', 'stopPoint'}, ...
+        {zeros(nTests, 8), zeros(nTests, 1), zeros(nTests, 1), ...
+        zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 1), ...
+        zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 8)});
+    
+    for iTest=1:nTests
+        map = updateMap(map, 'x0', iTest, table(iTest, 1:8));
+        map = updateMap(map, 'tsCriterion', iTest, table(iTest, 9));
+        map = updateMap(map, 'sdreCriterion', iTest, table(iTest, 10));
+        map = updateMap(map, 'tsTime', iTest, table(iTest, 11));
+        map = updateMap(map, 'sdreTime', iTest, table(iTest, 12));
+        map = updateMap(map, 'tsWallTime', iTest, table(iTest, 13));
+        map = updateMap(map, 'sdreWallTime', iTest, table(iTest, 14));
+        map = updateMap(map, 'insideEpsTube', iTest, table(iTest, 15));
+        map = updateMap(map, 'stopPoint', iTest, table(iTest, 16:end));
+    end
 end
