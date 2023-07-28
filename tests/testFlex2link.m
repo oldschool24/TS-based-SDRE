@@ -61,11 +61,12 @@ function testFlex2link(testConfigPath)
     testStats = zeros(nTests, 8+7+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
-    warning('off', 'all')
+    
     tic
     parfor k=1:nTests
 %     idxExamples = 1;
 %     for k=idxExamples:idxExamples
+        warning('off', 'all')    
         x0 = [q1(k); q2(k); z1(k); z2(k); 0; 0; 0; 0]; 
         if ismember(k, idxExamples)
             imgDir = fullfile( ...

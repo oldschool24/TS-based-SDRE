@@ -75,8 +75,12 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
                                              x_pure, sysName, hatB, Q, R);
 %         stabilizable(hatA, hatB) && detectable(hatA, sqrtm(Q))  % check
     else
-        hatA = 1/dt * (waveA - eye(n));
-%         hatA = weightedA(dt, waveA, x_pure, 'perMatrix');
+%         hatA = 1/dt * (waveA - eye(n));
+        hatA = estimateA(dt, waveA, x_pure, 'offset', hatB, Q, R);
+        
+        % TODO: COMMENT!!!!!!
+        hatB = sys.get_B(x, 'flex2link');      
+        
         [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB);
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
     end
@@ -132,12 +136,15 @@ function [hatA, P, info] = minimalAndSimilarA(dt, waveA, x_processed, ...
     [P, ~, ~, info] = icare(hatA, hatB, Q, R);
 end
 
-function hatA = weightedA(dt, waveA, x, type)
+function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
     n = numel(x);
-    fHat = 1/dt * (waveA-eye(n)) * x;
-    global w_alpha; % [zeros(n, 1); 1]
+    hatA = 1/dt * (waveA-eye(n));
+    fHat = hatA * x;
     
+    global w_alpha; % [zeros(n, 1); 1]
+    global x_old;
     if strcmp(type, 'perMatrix')
+        % solution = weighted sum of matrices(candidates)
         candidates = zeros(n, n, n+1);
         for iCandidate=1:n
             A = zeros(n, n);
@@ -156,6 +163,7 @@ function hatA = weightedA(dt, waveA, x, type)
             w_alpha = [zeros(n, 1); 1];
         end
     elseif strcmp(type, 'perElement')
+        % as previous, but candidates = elements, not matrix
         candidates = fHat ./ x';  % a_ij = f_i / x_j
         [ii, jj] = find(isinf(candidates));
         linIdxs = sub2ind([n, n], ii, jj);
@@ -170,29 +178,73 @@ function hatA = weightedA(dt, waveA, x, type)
         if isempty(w_alpha)
             w_alpha = ones(n^2, 1) / n;
         end
+    elseif strcmp(type, 'offset')
+        % solution = offset that improves the original estimate
+                
+        % TODO: COMMENT!!!!!!
+        hatA = sys.get_A(x, 'flex2link');
+
+        candidates = hatA;
+
+        % Equality constrain for all i: sum_j(dA_ij * x_j) = 0
+        Aeq = zeros(n, n^2);
+        for ix=1:n
+            Aeq(ix, ix:n:n^2) = x(:);
+        end
+        beq = zeros(n, 1);
+        % -eps < dA < eps
+%         eps = max(1e-4 * abs(hatA), 1e-6);
+        dA_abs = 1e-2;
+        eps = dA_abs * abs(hatA);
+        if isempty(w_alpha)
+%             eps = 1e-2 * abs(hatA);
+            w_alpha = zeros(n^2, 1);
+        end
+        lb = reshape(-eps, [], 1);
+        ub = reshape(eps, [], 1);
     end
    
-    wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type), ...
-                  w_alpha, [], [], Aeq, beq, lb, ub, [], ...
-                  optimoptions('fmincon', 'Display', 'off', ...
-                  'OptimalityTolerance', 1e-6, 'MaxIterations', 10, ...
-                  'ConstraintTolerance', 1e-6));
-    w_alpha = wOpt;
+    eps_x = 0.01;
+    if norm(x - x_old) > eps_x
+        wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type, hatB, Q, R, x), ...
+                      w_alpha, [], [], Aeq, beq, lb, ub, [], ...
+                      optimoptions('fmincon', 'Display', 'off', ... % off, iter
+                      'OptimalityTolerance', 1e-6, 'MaxIterations', 10, ...
+                      'ConstraintTolerance', 1e-6));
+        w_alpha = wOpt;
+        x_old = x;
+    end
 
     if strcmp(type, 'perMatrix')
-        hatA = sum(candidates .* reshape(wOpt, 1, 1, []), 3);
+        hatA = sum(candidates .* reshape(w_alpha, 1, 1, []), 3);
     elseif strcmp(type, 'perElement')
-        hatA = candidates .* reshape(wOpt, size(candidates));
+        hatA = candidates .* reshape(w_alpha, size(candidates));
+    elseif strcmp(type, 'offset')
+        dA = reshape(w_alpha, size(hatA));
+%         disp(all(dA >= -eps, 'all') && all(dA <= eps, 'all'))
+        hatA = hatA + dA;
     end
-%     fHat - hatA * x
+%     disp(max(abs(fHat - hatA * x)))
 end
 
-function value = bestFactorizationObjective(w, candidates, type)
+function value = bestFactorizationObjective(w, candidates, type, ...
+                                            hatB, Q, R, x)
     if strcmp(type, 'perMatrix')
-        weighted = sum(candidates .* reshape(w, 1, 1, []), 3);
+        % weighted sum of matrix candidates
+        A = sum(candidates .* reshape(w, 1, 1, []), 3);
+        value = norm(A) * norm(inv(A));
     elseif strcmp(type, 'perElement')
         matrW = reshape(w, size(candidates));
-        weighted = matrW .* candidates;
+        % weighted sum of element candidates
+        A = matrW .* candidates;
+        value = norm(A) * norm(inv(A));
+    elseif strcmp(type, 'offset')
+        A = candidates;
+        dA = reshape(w, size(A));
+        A = A + dA;
+
+%         value = norm(A) * norm(inv(A));
+        P = icare(A, hatB, Q, R);
+        value = x' * P * x;
     end
-    value = norm(weighted) * norm(inv(weighted));
 end

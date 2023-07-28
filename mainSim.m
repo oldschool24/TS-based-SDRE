@@ -90,7 +90,9 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     timesteps = 0:dt:T;
     rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
     global w_alpha;
+    global x_old;
     w_alpha = [];
+    x_old = x0;
     
     sdreWallTime = tic;
     [t, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
