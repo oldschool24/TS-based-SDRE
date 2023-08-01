@@ -62,6 +62,8 @@ function testFlex2link(testConfigPath)
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     
+    WaitMessage = utils.parfor_wait(nTests, 'Waitbar', true); %append('Testing. Export path is ', expPath), true);
+
     tic
     parfor k=1:nTests
 %     idxExamples = 1;
@@ -93,7 +95,11 @@ function testFlex2link(testConfigPath)
             B_true = [B_true; simStats.B_true]; 
             B_pred = [B_pred; simStats.B_pred]; 
         end
+
+        WaitMessage.Send;
     end
+
+    WaitMessage.Destroy;
 
     testStats = table2map(testStats);
     save(fullfile(folderPath, testConfigName), 'testStats')
