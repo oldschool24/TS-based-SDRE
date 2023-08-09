@@ -75,11 +75,11 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
                                              x_pure, sysName, hatB, Q, R);
 %         stabilizable(hatA, hatB) && detectable(hatA, sqrtm(Q))  % check
     else
-%         hatA = 1/dt * (waveA - eye(n));
-        hatA = estimateA(dt, waveA, x_pure, 'offset', hatB, Q, R);
+        hatA = 1/dt * (waveA - eye(n));
+%         hatA = estimateA(dt, waveA, x_pure, 'offset', hatB, Q, R);
         
         % TODO: COMMENT!!!!!!
-        hatB = sys.get_B(x, 'flex2link');      
+%         hatB = sys.get_B(x, 'flex2link');      
         
         [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB);
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
@@ -182,7 +182,7 @@ function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
         % solution = offset that improves the original estimate
                 
         % TODO: COMMENT!!!!!!
-        hatA = sys.get_A(x, 'flex2link');
+%         hatA = sys.get_A(x, 'flex2link');
 
         candidates = hatA;
 
@@ -193,8 +193,10 @@ function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
         end
         beq = zeros(n, 1);
         % -eps < dA < eps
-%         eps = max(1e-4 * abs(hatA), 1e-6);
-        dA_abs = 1e-2;
+        % NOW CODE IS WORKING IN MAIN MODE!!!!!!!!!!!!!!!!!!
+        dA_abs = 5e-3;
+%         dA_thr = 1e-3;
+%         eps = max(dA_abs * abs(hatA), dA_thr);
         eps = dA_abs * abs(hatA);
         if isempty(w_alpha)
 %             eps = 1e-2 * abs(hatA);
@@ -204,7 +206,7 @@ function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
         ub = reshape(eps, [], 1);
     end
    
-    eps_x = 0.01;
+    eps_x = 1;
     if norm(x - x_old) > eps_x
         wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type, hatB, Q, R, x), ...
                       w_alpha, [], [], Aeq, beq, lb, ub, [], ...
@@ -243,8 +245,8 @@ function value = bestFactorizationObjective(w, candidates, type, ...
         dA = reshape(w, size(A));
         A = A + dA;
 
-%         value = norm(A) * norm(inv(A));
-        P = icare(A, hatB, Q, R);
-        value = x' * P * x;
+        value = norm(A) * norm(inv(A));
+%         P = icare(A, hatB, Q, R);
+%         value = x' * P * x;
     end
 end
