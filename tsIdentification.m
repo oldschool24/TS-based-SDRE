@@ -16,7 +16,11 @@ function tsIdentification(configPath)
         load(dataName, 'trainData')
     else
         rng(1, 'twister')   % for reproducibility
-        x0Grid = utils.uniformGrid(x0Range, nPoints);
+        if exist('x0Grid', 'var')
+            x0Grid = [utils.uniformGrid(x0Range, nPoints); x0Grid];
+        else
+            x0Grid = utils.uniformGrid(x0Range, nPoints);
+        end
         if withPI   
 %             % trajectory -> ss-model -> PI-control -> dataset 
 %             trainData = utils.collectData(sysName, x0Grid(1, :), xRange, ...

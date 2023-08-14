@@ -120,6 +120,8 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     simStats.tsCriterion = tsCriterion;
     simStats.sdreWallTime = sdreWallTime;
     simStats.sdreCriterion = sdreCriterion;
+    simStats.sdreX = sdreX;
+    simStats.tsX = tsX;
 
     if verbose
         if simStats.tsTime < simStats.sdreTime
@@ -156,7 +158,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     end
 
     if isAnalyze
-        simStats.tsX = tsX;
+        
         simStats.predX = predX;
         simStats.f_true = f_true;
         simStats.f_pred = f_pred; 

@@ -51,6 +51,7 @@ function testFlex2link(testConfigPath)
     end
     xRange(1, 1:2) = -inf;
     xRange(2, 1:2) = inf;
+    sdreX = [];
     tsX = [];
     predX = [];
     f_true = [];
@@ -87,15 +88,15 @@ function testFlex2link(testConfigPath)
             simStats.tsTime, simStats.sdreTime, ...
             simStats.tsWallTime, simStats.sdreWallTime, ...
             simStats.insideEpsTube, simStats.stopPoint];
+        sdreX = [sdreX; simStats.sdreX];
+        tsX = [tsX; simStats.tsX];
         if isAnalyze
-            tsX = [tsX; simStats.tsX]; 
             predX = [predX; simStats.predX]; 
             f_true = [f_true; simStats.f_true]; 
             f_pred = [f_pred; simStats.f_pred]; 
             B_true = [B_true; simStats.B_true]; 
             B_pred = [B_pred; simStats.B_pred]; 
         end
-
         WaitMessage.Send;
     end
 
@@ -104,6 +105,9 @@ function testFlex2link(testConfigPath)
     testStats = table2map(testStats);
     save(fullfile(folderPath, testConfigName), 'testStats')
     printResults(testStats)
+
+    save(fullfile(folderPath, 'test_tsX'), 'tsX')
+    save(fullfile(folderPath, 'test_sdreX'), 'sdreX')
 
     if isAnalyze
         utils.wrapperStats('flex2link', tsX, predX, f_true, f_pred, ...
