@@ -25,7 +25,6 @@ function testFlex2link(testConfigPath)
     stopType = testConfig.stopType;
     xRange = testConfig.xRange;
 
-
     addpath('../')
     if isempty(z1Range) || isempty(z2Range)
         [q1, q2] = ndgrid(q1Range, q2Range);

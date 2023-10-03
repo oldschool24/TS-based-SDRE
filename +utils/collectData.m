@@ -140,11 +140,17 @@ function res = trainFuncs(uniformInterval, expAlpha)
     [~, nExp] = size(expAlpha);
     res = cell(nFuncs + nExp, 1);
     for iFunc=1:nFuncs
-        res{iFunc} = @(t) amp(:, iFunc).*rand(r, 1) + offset(:, iFunc);
+%         res{iFunc} = @(t) amp(:, iFunc).*rand(r, 1) + offset(:, iFunc);
+        res{iFunc} = @(t) randomControl(amp(:, iFunc), r, offset(:, iFunc));
     end
     for iExp=1:nExp
         amp = uniformInterval(:, randi(nFuncs), 2);
         alpha = expAlpha(:, iExp);
         res{nFuncs + iExp} = @(t) amp .* sin(5* alpha * t) .* exp(alpha * t);
     end
+end
+
+function u = randomControl(amp, r, offset)
+    randU = rand(r, 1) .* (rand(r, 1) < 1); % can use parameter instead 1
+    u = amp.*randU + offset;
 end
