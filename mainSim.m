@@ -132,10 +132,19 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
         disp(['Criterion value of classic method: ' num2str(sdreCriterion)])
     end
 
+    % calculate the estimation error
+    [uList, f_true, f_pred, B_true, B_pred] = utils.logger( ...
+        sysName, tsX, r, extendedModel, dt, known, Q, R, isWrap, false);
+    simStats.f_error = norm_count(f_true - f_pred) ./ norm_count(f_true);
+    simStats.B_error = zeros(1, r);
+    for k=1:r
+        simStats.B_error(k) = norm_count(B_true(:, :, k) - B_pred(:, :, k));
+        simStats.B_error(k) = simStats.B_error(k) ./ ...
+                              norm_count(B_true(:, :, k));
+    end
+
     if or(~isempty(imgDir), isAnalyze)
-        % 2.1 Calculate u, estimates(x, f, B) at timesteps
-        [uList, f_true, f_pred, B_true, B_pred] = utils.logger( ...
-            sysName, tsX, r, extendedModel, dt, known, Q, R, isWrap, false);
+        % 2.1 Calculate SDRE at timesteps
         [nSteps, ~] = size(tsX);
         sdreList = zeros(nSteps, r);    % SDRE values at timesteps
         for iStep=1:nSteps
@@ -158,7 +167,6 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     end
 
     if isAnalyze
-        
         simStats.predX = predX;
         simStats.f_true = f_true;
         simStats.f_pred = f_pred; 
@@ -243,4 +251,13 @@ function plotComparison(figName, lineName, kStart, timesteps, ...
     ax = gca;
     ax.FontSize = 18;
     exportgraphics(gca, fullfile(imgDir, [figName '.png']))
+end
+
+function res = norm_count(err)
+    res = 0;
+    [nVectors, ~] = size(err);
+    for iVector=1:nVectors
+        res = res + norm(err(iVector, :));
+    end
+    res = res / nVectors;
 end

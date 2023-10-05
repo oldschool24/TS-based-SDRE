@@ -57,6 +57,8 @@ function testFlex2link(testConfigPath)
     f_pred = []; 
     B_true = []; 
     B_pred = [];
+    f_error = zeros(nTests, 1);
+    B_error = zeros(nTests, 2);
 
     testStats = zeros(nTests, 8+7+8);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
@@ -87,6 +89,8 @@ function testFlex2link(testConfigPath)
             simStats.tsTime, simStats.sdreTime, ...
             simStats.tsWallTime, simStats.sdreWallTime, ...
             simStats.insideEpsTube, simStats.stopPoint];
+        f_error(k) = simStats.f_error;
+        B_error(k, :) = simStats.B_error;
         sdreX = [sdreX; simStats.sdreX];
         tsX = [tsX; simStats.tsX];
         if isAnalyze
@@ -104,6 +108,10 @@ function testFlex2link(testConfigPath)
     testStats = table2map(testStats);
     save(fullfile(folderPath, testConfigName), 'testStats')
     printResults(testStats)
+    
+    utils.savePlots(f_error, folderPath, 'f')
+    utils.savePlots(B_error(:, 1), folderPath, 'B1')
+    utils.savePlots(B_error(:, 2), folderPath, 'B2')
 
     save(fullfile(folderPath, 'test_tsX'), 'tsX')
     save(fullfile(folderPath, 'test_sdreX'), 'sdreX')
