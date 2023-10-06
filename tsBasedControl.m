@@ -1,8 +1,10 @@
 function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
-    x, extendedModel, sysName, dt, known, Q, R, isWrap)
+    t, x, T, extendedModel, sysName, dt, known, Q, R, isWrap, ctrlProcessId)
 % this function finds SDRE-control based on tsModel, x - state vector
     arguments
+        t
         x
+        T
         extendedModel
         sysName
         dt double {mustBePositive}
@@ -10,6 +12,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         Q = []
         R = []
         isWrap = false
+        ctrlProcessId = 1 % optimization id (number of the current control task)
     end
 
     % 1. Set default values
@@ -76,10 +79,10 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
 %         stabilizable(hatA, hatB) && detectable(hatA, sqrtm(Q))  % check
     else
 %         hatA = 1/dt * (waveA - eye(n));
-        hatA = estimateA(dt, waveA, x_pure, 'offset', hatB, Q, R);
+        hatA = estimateA(t, dt, T, waveA, x_pure, 'offset', hatB, Q, R, ctrlProcessId);
         
-        % TODO: COMMENT!!!!!!
-        hatB = sys.get_B(x, 'flex2link');      
+%         % TODO: COMMENT!!!!!!
+%         hatB = sys.get_B(x, 'flex2link');      
         
         [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB);
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
@@ -136,13 +139,16 @@ function [hatA, P, info] = minimalAndSimilarA(dt, waveA, x_processed, ...
     [P, ~, ~, info] = icare(hatA, hatB, Q, R);
 end
 
-function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
+function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
     n = numel(x);
     hatA = 1/dt * (waveA-eye(n));
     fHat = hatA * x;
     
-    global w_alpha; % [zeros(n, 1); 1]
-    global x_old;
+% % %     global w_alpha; % [zeros(n, 1); 1]
+% % %     global x_old;
+
+    [w_alpha, x_old] = getGlobalVars(ctrlProcessId);
+
     if strcmp(type, 'perMatrix')
         % solution = weighted sum of matrices(candidates)
         candidates = zeros(n, n, n+1);
@@ -161,6 +167,7 @@ function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
         ub = ones(n+1, 1);
         if isempty(w_alpha)
             w_alpha = [zeros(n, 1); 1];
+            set_w_alpha(ctrlProcessId, w_alpha); 
         end
     elseif strcmp(type, 'perElement')
         % as previous, but candidates = elements, not matrix
@@ -177,12 +184,13 @@ function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
 %         ub(linIdxs) = 0;
         if isempty(w_alpha)
             w_alpha = ones(n^2, 1) / n;
+            set_w_alpha(ctrlProcessId, w_alpha);
         end
     elseif strcmp(type, 'offset')
         % solution = offset that improves the original estimate
                 
-        % TODO: COMMENT!!!!!!
-        hatA = sys.get_A(x, 'flex2link');
+%         % TODO: COMMENT!!!!!!
+%         hatA = sys.get_A(x, 'flex2link');
 
         candidates = hatA;
 
@@ -194,25 +202,48 @@ function hatA = estimateA(dt, waveA, x, type, hatB, Q, R)
         beq = zeros(n, 1);
         % -eps < dA < eps
 %         eps = max(1e-4 * abs(hatA), 1e-6);
-        dA_abs = 1e-2;
+        dA_abs = 1.00E-01;
         eps = dA_abs * abs(hatA);
-        if isempty(w_alpha)
-%             eps = 1e-2 * abs(hatA);
-            w_alpha = zeros(n^2, 1);
-        end
         lb = reshape(-eps, [], 1);
         ub = reshape(eps, [], 1);
+
+        if isempty(w_alpha)
+%             eps = 1e-2 * abs(hatA);
+
+            w_alpha = zeros(n^2, 1);
+            set_w_alpha(ctrlProcessId, w_alpha);
+         
+            tStart = tic;
+            % New: make w_alpha init via more deep optimization  
+            w_alpha = fmincon(@(w) bestFactorizationObjective(w, candidates, type, hatB, Q, R, x), ...
+                          w_alpha, [], [], Aeq, beq, lb, ub, [], ...
+                          optimoptions('fmincon', 'Algorithm', ...
+                          'interior-point', ...
+                          'Display', 'off', ... % off, iter
+                          'OptimalityTolerance', 1e-6, 'MaxIterations', 1000, ...
+                          'ConstraintTolerance', 1e-6));
+            set_w_alpha(ctrlProcessId, w_alpha);
+            tEnd = toc(tStart); 
+            disp(append('Task id = ', num2str(ctrlProcessId), '. Initial optimization time = ', num2str(tEnd)));
+        end
     end
    
-    eps_x = 0.01;
+    eps_x = 1;
     if norm(x - x_old) > eps_x
+%         tStart = tic;
         wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type, hatB, Q, R, x), ...
                       w_alpha, [], [], Aeq, beq, lb, ub, [], ...
-                      optimoptions('fmincon', 'Display', 'off', ... % off, iter
-                      'OptimalityTolerance', 1e-6, 'MaxIterations', 10, ...
+                      optimoptions('fmincon', 'Algorithm', ...
+                      'sqp', ... %'interior-point', ...
+                      'Display', 'off', ... % off, iter
+                      'OptimalityTolerance', 1e-6, 'MaxIterations', 100, ...
                       'ConstraintTolerance', 1e-6));
+%         tEnd = toc(tStart); 
+%         disp(append('Task id = ', num2str(ctrlProcessId), '. Current time = ', num2str(t), ' of ', num2str(T), '. Current optimization time = ', num2str(tEnd)));
         w_alpha = wOpt;
+        set_w_alpha(ctrlProcessId, w_alpha);
         x_old = x;
+        set_x_oldVar(ctrlProcessId, x_old);
     end
 
     if strcmp(type, 'perMatrix')
@@ -242,9 +273,56 @@ function value = bestFactorizationObjective(w, candidates, type, ...
         A = candidates;
         dA = reshape(w, size(A));
         A = A + dA;
+%         value = -1 * norm(A) * norm(inv(A));
 
-%         value = norm(A) * norm(inv(A));
         P = icare(A, hatB, Q, R);
         value = x' * P * x;
     end
+end
+
+function [w_alphaVar, x_oldVar] = getGlobalVars(ctrlProcessId)
+%     %% First method: using global vars technique 
+%     global w_alpha, global x_old; 
+%     w_alphaVar = w_alpha; 
+%     x_oldVar = x_old; 
+    
+    %% Second method: using global vars technique 
+    w_alpha_uniq_name = append('w_alpha_', num2str(ctrlProcessId)); 
+    workspace_name = 'base'; % may be cellar?
+    ise = evalin( workspace_name, append('exist(''', w_alpha_uniq_name, ''',''var'') == 1' ));
+    if ise
+        w_alphaVar = evalin(workspace_name, w_alpha_uniq_name); 
+    else 
+        w_alphaVar = []; 
+    end
+
+    x_old_uniq_name = append('x_old_', num2str(ctrlProcessId)); 
+    ise = evalin( workspace_name, append('exist(''', x_old_uniq_name, ''',''var'') == 1' ));
+    if ise
+        x_oldVar = evalin(workspace_name, x_old_uniq_name); 
+    else 
+        error(append('Unable to find ', x_old_uniq_name, ' in ', workspace_name, ' workspace')); 
+    end
+end
+
+function set_w_alpha(ctrlProcessId, w_alphaVar)
+%     %% First method: using global vars technique 
+%     global w_alpha, global x_old; 
+%     w_alpha = w_alphaVar; 
+    
+    %% Second method: using global vars technique 
+    w_alpha_uniq_name = append('w_alpha_', num2str(ctrlProcessId)); 
+    workspace_name = 'base'; % may be cellar?
+    assignin(workspace_name, w_alpha_uniq_name, w_alphaVar);
+end
+
+function set_x_oldVar(ctrlProcessId, x_oldVar)
+%     %% First method: using global vars technique 
+%     global w_alpha, global x_old; 
+%     x_old = x_oldVar; 
+    
+    %% Second method: using global vars technique  
+    workspace_name = 'base'; 
+    x_old_uniq_name = append('x_old_', num2str(ctrlProcessId)); 
+    assignin(workspace_name, x_old_uniq_name, x_oldVar);
 end

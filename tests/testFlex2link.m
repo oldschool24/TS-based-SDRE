@@ -63,9 +63,11 @@ function testFlex2link(testConfigPath)
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     
     WaitMessage = utils.parfor_wait(nTests, 'Waitbar', true); %append('Testing. Export path is ', expPath), true);
-
+    parpool(8);
+    
     tic
-    parfor k=1:nTests
+    parfor (k=1:nTests, 8)
+%     for k=1:nTests
 %     idxExamples = 1;
 %     for k=idxExamples:idxExamples
         warning('off', 'all')    
@@ -81,7 +83,7 @@ function testFlex2link(testConfigPath)
         end
         simStats = mainSim(modelPath, 'flex2link', dt, T, x0, Q, R, ...
                            stopType, xRange, @ode15s, isWrap, ...
-                           imgDir, known, isAnalyze);
+                           imgDir, known, isAnalyze, false, true, k);
         testStats(k, :) = [
             x0', simStats.tsCriterion, simStats.sdreCriterion, ...
             simStats.tsTime, simStats.sdreTime, ...

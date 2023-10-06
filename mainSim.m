@@ -1,6 +1,6 @@
 function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
                             xRange, ode, isWrap, imgDir, known, ...
-                            isAnalyze, isWarn, verbose)
+                            isAnalyze, isWarn, verbose, ctrlProcessId)
     arguments
         modelPath
         sysName
@@ -18,6 +18,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
         isAnalyze = false
         isWarn = false
         verbose = true
+        ctrlProcessId = 1
     end
 
     % 0.1 Set default values
@@ -48,11 +49,11 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     end
     
     % 0.2 add calculation of criterion to rhs
-    function dXdt = rhsWithCriterion(x, uName, sysName, Q, R, ...
-                                     extendedModel, dt, known)
+    function dXdt = rhsWithCriterion(t, x, T, uName, sysName, Q, R, ...
+                                     extendedModel, dt, known, ctrlProcessId)
         if strcmp(uName, 'tsBased')
-            u = tsBasedControl(x, extendedModel, sysName, dt, known, ...
-                               Q, R, isWrap);
+            u = tsBasedControl(t, x, T, extendedModel, sysName, dt, known, ...
+                               Q, R, isWrap, ctrlProcessId);
         elseif strcmp(uName, 'SDRE')
             u = sdre(x, sysName, Q, R);
         end
@@ -68,9 +69,9 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     end
 
     % 0.3 event detection, event = there is no solution of SDRE
-    function [condition, isTerminal, direction] = nonvalidTS(x)
+    function [condition, isTerminal, direction] = nonvalidTS(t, x, T, ctrlProcessId)
         [u, ~, ~, errorFlag] = tsBasedControl( ...
-            x, extendedModel, sysName, dt, known, Q, R, isWrap);
+            t, x, T, extendedModel, sysName, dt, known, Q, R, isWrap, ctrlProcessId);
         if strcmp(stopType, 'trajectory')
             [condition, isTerminal, direction] = stopDueTraj(x, xRange);
         elseif strcmp(stopType, 'control')
@@ -88,14 +89,24 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
 
     % 1.1 integrate
     timesteps = 0:dt:T;
-    rhs = @(x) rhsWithCriterion(x, 'SDRE', sysName, Q, R);
-    global w_alpha;
-    global x_old;
-    w_alpha = [];
-    x_old = x0;
+    rhs = @(t, x) rhsWithCriterion(t, x, T, 'SDRE', sysName, Q, R, ctrlProcessId);
+
+% % %     global w_alpha;
+% % %     global x_old;
+% % %     w_alpha = [];
+% % %     x_old = x0;
+
+    % try to use assignin instead of global vars.
+    w_alpha_uniq_name = append('w_alpha_', num2str(ctrlProcessId));
+    workspace_name = 'base'; % may be cellar?
+    assignin(workspace_name, w_alpha_uniq_name, []); 
+
+    x_old_uniq_name = append('x_old_', num2str(ctrlProcessId));
+    assignin(workspace_name, x_old_uniq_name, x0); 
+
     
     sdreWallTime = tic;
-    [t, sdreX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], sdreOpt);
+    [t, sdreX] = ode(@(t, x) rhs(t, x(1:end-1)), timesteps, [x0; 0], sdreOpt);
     sdreWallTime = toc(sdreWallTime);
     simStats.sdreTime = t(end);
     sdreCriterion = sdreX(end, end);
@@ -104,11 +115,11 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     if strcmp(stopType, 'control')
         u0 = tsBasedControl(x0, extendedModel, sysName, dt, known, Q, R, isWrap);
     end
-    rhs = @(x) rhsWithCriterion(x, 'tsBased', sysName, Q, R, ...
-                                extendedModel, dt, known);
-    tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS(x(1:end-1)));
+    rhs = @(t, x) rhsWithCriterion(t, x, T, 'tsBased', sysName, Q, R, ...
+                                extendedModel, dt, known, ctrlProcessId);
+    tsOpt = odeset(tsOpt, 'Events', @(t, x) nonvalidTS(t, x(1:end-1), T, ctrlProcessId));
     tsWallTime = tic;
-    [t, tsX] = ode(@(t, x) rhs(x(1:end-1)), timesteps, [x0; 0], tsOpt);
+    [t, tsX] = ode(@(t, x) rhs(t, x(1:end-1)), timesteps, [x0; 0], tsOpt);
     tsWallTime = toc(tsWallTime);
     simStats.stopPoint = tsX(end, 1:end-1);
     simStats.tsTime = t(end);
