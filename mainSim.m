@@ -97,13 +97,24 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
 % % %     x_old = x0;
 
     % try to use assignin instead of global vars.
-    w_alpha_uniq_name = append('w_alpha_', num2str(ctrlProcessId));
+    % NOTE: the same var names must be used in tsBasedControl
+    % TODO: make names declaration only once in the program
+    w_alpha_name = 'w_alpha_';
+    x_old_name = 'x_old_'; 
+    first_opt_time_name = 'first_time_';
+    flow_opt_mean_time_name = 'flow_mean_time_'; 
+
+    w_alpha_unique_name = append(w_alpha_name, num2str(ctrlProcessId));
     workspace_name = 'base'; % may be cellar?
-    assignin(workspace_name, w_alpha_uniq_name, []); 
+    assignin(workspace_name, w_alpha_unique_name, []); 
 
-    x_old_uniq_name = append('x_old_', num2str(ctrlProcessId));
-    assignin(workspace_name, x_old_uniq_name, x0); 
+    x_old_unique_name = append(x_old_name, num2str(ctrlProcessId));
+    assignin(workspace_name, x_old_unique_name, x0); 
 
+    assignin(workspace_name, append(first_opt_time_name, num2str(ctrlProcessId)), []);
+    assignin(workspace_name, append(flow_opt_mean_time_name, num2str(ctrlProcessId)), []);
+    assignin(workspace_name, append('tsBasedControlTime_', num2str(ctrlProcessId)), []);
+    assignin(workspace_name, append('tsBasedIdentificationTime_', num2str(ctrlProcessId)), []);
     
     sdreWallTime = tic;
     [t, sdreX] = ode(@(t, x) rhs(t, x(1:end-1)), timesteps, [x0; 0], sdreOpt);
@@ -131,6 +142,11 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     simStats.tsCriterion = tsCriterion;
     simStats.sdreWallTime = sdreWallTime;
     simStats.sdreCriterion = sdreCriterion;
+    simStats.tsFirstOptTime = evalin(workspace_name, append(first_opt_time_name, num2str(ctrlProcessId)));
+    simStats.tsFlowOptMeanTime = evalin(workspace_name, append(flow_opt_mean_time_name, num2str(ctrlProcessId)));
+    simStats.tsBasedControlTime = evalin(workspace_name, append('tsBasedControlTime_', num2str(ctrlProcessId)));
+    simStats.tsBasedIdentificationTime = evalin(workspace_name, append('tsBasedIdentificationTime_', num2str(ctrlProcessId)));
+
 
     if verbose
         if simStats.tsTime < simStats.sdreTime

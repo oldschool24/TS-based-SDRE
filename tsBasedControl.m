@@ -15,6 +15,8 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         ctrlProcessId = 1 % optimization id (number of the current control task)
     end
 
+    tsBasedControlTime = tic;
+
     % 1. Set default values
     errorFlag = false;
     if strcmp(sysName, 'motorLink')
@@ -46,6 +48,7 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     nRules = length(tsModel.Rules);
 
     % 2. Calculate waveA, waveB: 
+    tsBasedIdentificationTime  = tic; 
     %    tsModel(x(k), u(k)) = waveA * x(k) + waveB * u(k)
     waveA = zeros(n, n);
     waveB = zeros(n, r);
@@ -88,6 +91,8 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
     end
     fHat = hatA * x_pure;
+    tsBasedIdentificationTime = toc(tsBasedIdentificationTime);
+    updateMeanTime(ctrlProcessId, 'tsBasedIdentificationTime_', tsBasedIdentificationTime);
 
     % 4. Calculate u = SDRE(hatA, hatB)
     if isempty(P)
@@ -99,6 +104,9 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     else
         u = -inv(R) * hatB' * P * x;  % TODO: x_pure instead x?
     end
+
+    tsBasedControlTime = toc(tsBasedControlTime);
+    updateMeanTime(ctrlProcessId, 'tsBasedControlTime_', tsBasedControlTime);
 end
 
 function [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB)
@@ -140,14 +148,22 @@ function [hatA, P, info] = minimalAndSimilarA(dt, waveA, x_processed, ...
 end
 
 function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
+    
+    %% ---   some params -------------
+    % % %     global w_alpha; % [zeros(n, 1); 1]
+    % % %     global x_old;
+    w_alpha_name = 'w_alpha_';
+    x_old_name = 'x_old_'; 
+    first_opt_time_name = 'first_time_';
+    flow_opt_mean_time_name = 'flow_mean_time_'; 
+
+    % --------------------------------
     n = numel(x);
     hatA = 1/dt * (waveA-eye(n));
     fHat = hatA * x;
     
-% % %     global w_alpha; % [zeros(n, 1); 1]
-% % %     global x_old;
-
-    [w_alpha, x_old] = getGlobalVars(ctrlProcessId);
+    w_alpha = get_var_from_workspace(ctrlProcessId, w_alpha_name);
+    x_old = get_var_from_workspace(ctrlProcessId, x_old_name);
 
     if strcmp(type, 'perMatrix')
         % solution = weighted sum of matrices(candidates)
@@ -167,7 +183,7 @@ function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
         ub = ones(n+1, 1);
         if isempty(w_alpha)
             w_alpha = [zeros(n, 1); 1];
-            set_w_alpha(ctrlProcessId, w_alpha); 
+            set_var_to_workspace(ctrlProcessId, w_alpha_name, w_alpha);
         end
     elseif strcmp(type, 'perElement')
         % as previous, but candidates = elements, not matrix
@@ -184,7 +200,7 @@ function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
 %         ub(linIdxs) = 0;
         if isempty(w_alpha)
             w_alpha = ones(n^2, 1) / n;
-            set_w_alpha(ctrlProcessId, w_alpha);
+            set_var_to_workspace(ctrlProcessId, w_alpha_name, w_alpha);
         end
     elseif strcmp(type, 'offset')
         % solution = offset that improves the original estimate
@@ -211,7 +227,7 @@ function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
 %             eps = 1e-2 * abs(hatA);
 
             w_alpha = zeros(n^2, 1);
-            set_w_alpha(ctrlProcessId, w_alpha);
+            set_var_to_workspace(ctrlProcessId, w_alpha_name, w_alpha);
          
             tStart = tic;
             % New: make w_alpha init via more deep optimization  
@@ -222,28 +238,30 @@ function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
                           'Display', 'off', ... % off, iter
                           'OptimalityTolerance', 1e-6, 'MaxIterations', 1000, ...
                           'ConstraintTolerance', 1e-6));
-            set_w_alpha(ctrlProcessId, w_alpha);
+            set_var_to_workspace(ctrlProcessId, w_alpha_name, w_alpha);
             tEnd = toc(tStart); 
-            disp(append('Task id = ', num2str(ctrlProcessId), '. Initial optimization time = ', num2str(tEnd)));
+            updateMeanTime(ctrlProcessId, first_opt_time_name, tEnd);
+%             disp(append('Task id = ', num2str(ctrlProcessId), '. Initial optimization time = ', num2str(tEnd)));
         end
     end
    
     eps_x = 1;
     if norm(x - x_old) > eps_x
-%         tStart = tic;
+        tStart = tic;
         wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type, hatB, Q, R, x), ...
                       w_alpha, [], [], Aeq, beq, lb, ub, [], ...
                       optimoptions('fmincon', 'Algorithm', ...
                       'sqp', ... %'interior-point', ...
                       'Display', 'off', ... % off, iter
-                      'OptimalityTolerance', 1e-6, 'MaxIterations', 100, ...
+                      'OptimalityTolerance', 1e-6, 'MaxIterations', 20, ...
                       'ConstraintTolerance', 1e-6));
-%         tEnd = toc(tStart); 
+        tEnd = toc(tStart); 
+        updateMeanTime(ctrlProcessId, flow_opt_mean_time_name, tEnd);
 %         disp(append('Task id = ', num2str(ctrlProcessId), '. Current time = ', num2str(t), ' of ', num2str(T), '. Current optimization time = ', num2str(tEnd)));
         w_alpha = wOpt;
-        set_w_alpha(ctrlProcessId, w_alpha);
+        set_var_to_workspace(ctrlProcessId, w_alpha_name, w_alpha);
         x_old = x;
-        set_x_oldVar(ctrlProcessId, x_old);
+        set_var_to_workspace(ctrlProcessId, x_old_name, x_old);
     end
 
     if strcmp(type, 'perMatrix')
@@ -273,56 +291,38 @@ function value = bestFactorizationObjective(w, candidates, type, ...
         A = candidates;
         dA = reshape(w, size(A));
         A = A + dA;
-%         value = -1 * norm(A) * norm(inv(A));
+        value = -1 * norm(A) * norm(inv(A));
 
-        P = icare(A, hatB, Q, R);
-        value = x' * P * x;
+%         P = icare(A, hatB, Q, R);
+%         value = x' * P * x;
     end
 end
 
-function [w_alphaVar, x_oldVar] = getGlobalVars(ctrlProcessId)
-%     %% First method: using global vars technique 
-%     global w_alpha, global x_old; 
-%     w_alphaVar = w_alpha; 
-%     x_oldVar = x_old; 
-    
-    %% Second method: using global vars technique 
-    w_alpha_uniq_name = append('w_alpha_', num2str(ctrlProcessId)); 
-    workspace_name = 'base'; % may be cellar?
-    ise = evalin( workspace_name, append('exist(''', w_alpha_uniq_name, ''',''var'') == 1' ));
-    if ise
-        w_alphaVar = evalin(workspace_name, w_alpha_uniq_name); 
-    else 
-        w_alphaVar = []; 
-    end
-
-    x_old_uniq_name = append('x_old_', num2str(ctrlProcessId)); 
-    ise = evalin( workspace_name, append('exist(''', x_old_uniq_name, ''',''var'') == 1' ));
-    if ise
-        x_oldVar = evalin(workspace_name, x_old_uniq_name); 
-    else 
-        error(append('Unable to find ', x_old_uniq_name, ' in ', workspace_name, ' workspace')); 
-    end
-end
-
-function set_w_alpha(ctrlProcessId, w_alphaVar)
-%     %% First method: using global vars technique 
-%     global w_alpha, global x_old; 
-%     w_alpha = w_alphaVar; 
-    
-    %% Second method: using global vars technique 
-    w_alpha_uniq_name = append('w_alpha_', num2str(ctrlProcessId)); 
-    workspace_name = 'base'; % may be cellar?
-    assignin(workspace_name, w_alpha_uniq_name, w_alphaVar);
-end
-
-function set_x_oldVar(ctrlProcessId, x_oldVar)
-%     %% First method: using global vars technique 
-%     global w_alpha, global x_old; 
-%     x_old = x_oldVar; 
-    
-    %% Second method: using global vars technique  
+function set_var_to_workspace(ctrlProcessId, varName, varVal) 
     workspace_name = 'base'; 
-    x_old_uniq_name = append('x_old_', num2str(ctrlProcessId)); 
-    assignin(workspace_name, x_old_uniq_name, x_oldVar);
+    var_unique_name = append(varName, num2str(ctrlProcessId)); 
+    assignin(workspace_name, var_unique_name, varVal);
+end
+
+function varVal = get_var_from_workspace(ctrlProcessId, varName) 
+    %% Second method: do not use global vars technique 
+    workspace_name = 'base'; % may be cellar?
+    var_unique_name = append(varName, num2str(ctrlProcessId)); 
+    ise = evalin( workspace_name, append('exist(''', var_unique_name, ''',''var'') == 1' ));
+    if ise
+        varVal = evalin(workspace_name, var_unique_name); 
+    else 
+        varVal = []; 
+    end
+end
+
+function updateMeanTime(ctrlProcessId, timeVar, timeVal)
+    curMeanTime = get_var_from_workspace(ctrlProcessId, timeVar);
+    if isempty(curMeanTime)
+        % no mean time yet, set current timeVal as mean value
+        set_var_to_workspace(ctrlProcessId, timeVar, timeVal); 
+    else
+        % update mean time 
+        set_var_to_workspace(ctrlProcessId, timeVar, (curMeanTime + timeVal) / 2); 
+    end
 end
