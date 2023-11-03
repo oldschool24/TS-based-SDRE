@@ -58,18 +58,18 @@ function testFlex2link(testConfigPath)
     B_true = []; 
     B_pred = [];
 
-    testStats = zeros(nTests, 8+7+8+4);
+    testStats = zeros(nTests, 8+7+8+5);
     warning('off', 'fuzzy:general:warnEvalfis_NoRuleFired')
     warning('off', 'fuzzy:general:diagEvalfis_OutOfRangeInput')
     
     WaitMessage = utils.parfor_wait(nTests, 'Waitbar', true); %append('Testing. Export path is ', expPath), true);
     
     if isempty(gcp('nocreate'))
-        parpool(24); 
+        parpool(); 
     end 
     
     tic
-    parfor (k=1:nTests, 24)
+    parfor (k=1:nTests)
 %     for k=1:nTests
 %     idxExamples = 1;
 %     for k=idxExamples:idxExamples
@@ -93,7 +93,8 @@ function testFlex2link(testConfigPath)
             simStats.tsWallTime, simStats.sdreWallTime, ...
             simStats.insideEpsTube, simStats.stopPoint, ...
             simStats.tsFirstOptTime, simStats.tsFlowOptMeanTime, ...
-            simStats.tsBasedControlTime, simStats.tsBasedIdentificationTime];
+            simStats.tsBasedControlTime, simStats.tsBasedIdentificationTime, ...
+            simStats.sdreMeanTime];
         if isAnalyze
             tsX = [tsX; simStats.tsX]; 
             predX = [predX; simStats.predX]; 
@@ -163,11 +164,12 @@ function map=table2map(table)
         {'x0', 'tsCriterion', 'sdreCriterion', 'tsTime', 'sdreTime', ...
         'tsWallTime', 'sdreWallTime', 'insideEpsTube', 'stopPoint', ...
         'tsFirstOptTime', 'tsFlowOptMeanTime', ...
-        'tsBasedControlTime', 'tsBasedIdentificationTime'}, ...
+        'tsBasedControlTime', 'tsBasedIdentificationTime', 'sdreMeanTime'}, ...
         {zeros(nTests, 8), zeros(nTests, 1), zeros(nTests, 1), ...
         zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 1), ...
         zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 8), ...
-        zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 1)});
+        zeros(nTests, 1), zeros(nTests, 1), zeros(nTests, 1), ...
+        zeros(nTests, 1), zeros(nTests, 1)});
     
     for iTest=1:nTests
         map = updateMap(map, 'x0', iTest, table(iTest, 1:8));
@@ -183,5 +185,6 @@ function map=table2map(table)
         map = updateMap(map, 'tsFlowOptMeanTime', iTest, table(iTest, 25));
         map = updateMap(map, 'tsBasedControlTime', iTest, table(iTest, 26));
         map = updateMap(map, 'tsBasedIdentificationTime', iTest, table(iTest, 27));
+        map = updateMap(map, 'sdreMeanTime', iTest, table(iTest, 28));
     end
 end

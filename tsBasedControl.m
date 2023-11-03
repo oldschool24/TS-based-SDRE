@@ -71,12 +71,15 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
         waveB = waveB + ruleFiring(iRule) * B;
 %         theta(iRule, :, :) = thenParams(1+(iRule-1)*(n+r):iRule*(n+r), :)';
     end
+    tsBasedIdentificationTime = toc(tsBasedIdentificationTime);
+    updateMeanTime(ctrlProcessId, 'tsBasedIdentificationTime_', tsBasedIdentificationTime);
 
     % 3. Calculate hatA, hatB: estimates of A(x), B(x)
     hatB = 1/dt * waveB;
     if isWrap && any(x_pure ~= x_processed)
 %         [hatA, P, info] = unwrappedAfromWrapped(waveA, n, x_processed, ...
 %                                                 x_pure, Q, R);
+        sdreTime = tic;
         [hatA, P, info] = minimalAndSimilarA(dt, waveA, x_processed, ...
                                              x_pure, sysName, hatB, Q, R);
 %         stabilizable(hatA, hatB) && detectable(hatA, sqrtm(Q))  % check
@@ -88,11 +91,10 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
 %         hatB = sys.get_B(x, 'flex2link');      
         
         [hatA, hatB] = knownChange(sysName, known, x_pure, hatA, hatB);
+        sdreTime = tic;
         [P, ~, ~, info] = icare(hatA, hatB, Q, R);
     end
     fHat = hatA * x_pure;
-    tsBasedIdentificationTime = toc(tsBasedIdentificationTime);
-    updateMeanTime(ctrlProcessId, 'tsBasedIdentificationTime_', tsBasedIdentificationTime);
 
     % 4. Calculate u = SDRE(hatA, hatB)
     if isempty(P)
@@ -104,7 +106,8 @@ function [u, fHat, hatB, errorFlag] = tsBasedControl( ...
     else
         u = -inv(R) * hatB' * P * x;  % TODO: x_pure instead x?
     end
-
+    sdreTime = toc(sdreTime);
+    updateMeanTime(ctrlProcessId, 'sdre_mean_time_', sdreTime);
     tsBasedControlTime = toc(tsBasedControlTime);
     updateMeanTime(ctrlProcessId, 'tsBasedControlTime_', tsBasedControlTime);
 end
@@ -218,7 +221,7 @@ function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
         beq = zeros(n, 1);
         % -eps < dA < eps
 %         eps = max(1e-4 * abs(hatA), 1e-6);
-        dA_abs = 1.00E-01;
+        dA_abs = 1.00E-03;
         eps = dA_abs * abs(hatA);
         lb = reshape(-eps, [], 1);
         ub = reshape(eps, [], 1);
@@ -245,7 +248,11 @@ function hatA = estimateA(t, dt, T, waveA, x, type, hatB, Q, R, ctrlProcessId)
         end
     end
    
+    %TODO:  uncomment a one string below!
     eps_x = 1;
+%     % do not use optimization in fact
+%     eps_x = 10000;
+
     if norm(x - x_old) > eps_x
         tStart = tic;
         wOpt = fmincon(@(w) bestFactorizationObjective(w, candidates, type, hatB, Q, R, x), ...
@@ -291,10 +298,13 @@ function value = bestFactorizationObjective(w, candidates, type, ...
         A = candidates;
         dA = reshape(w, size(A));
         A = A + dA;
-        value = -1 * norm(A) * norm(inv(A));
 
-%         P = icare(A, hatB, Q, R);
-%         value = x' * P * x;
+%         % cost function norm(A) * norm(inv(A)) 
+%         value = -1 * norm(A) * norm(inv(A));
+
+        % cost function x' * P * x;
+        P = icare(A, hatB, Q, R);
+        value = x' * P * x;
     end
 end
 

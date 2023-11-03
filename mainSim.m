@@ -103,6 +103,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     x_old_name = 'x_old_'; 
     first_opt_time_name = 'first_time_';
     flow_opt_mean_time_name = 'flow_mean_time_'; 
+    sdre_mean_time_name = 'sdre_mean_time_'; 
 
     w_alpha_unique_name = append(w_alpha_name, num2str(ctrlProcessId));
     workspace_name = 'base'; % may be cellar?
@@ -115,6 +116,7 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     assignin(workspace_name, append(flow_opt_mean_time_name, num2str(ctrlProcessId)), []);
     assignin(workspace_name, append('tsBasedControlTime_', num2str(ctrlProcessId)), []);
     assignin(workspace_name, append('tsBasedIdentificationTime_', num2str(ctrlProcessId)), []);
+    assignin(workspace_name, append(sdre_mean_time_name, num2str(ctrlProcessId)), []);
     
     sdreWallTime = tic;
     [t, sdreX] = ode(@(t, x) rhs(t, x(1:end-1)), timesteps, [x0; 0], sdreOpt);
@@ -142,10 +144,11 @@ function simStats = mainSim(modelPath, sysName, dt, T, x0, Q, R, stopType, ...
     simStats.tsCriterion = tsCriterion;
     simStats.sdreWallTime = sdreWallTime;
     simStats.sdreCriterion = sdreCriterion;
-    simStats.tsFirstOptTime = evalin(workspace_name, append(first_opt_time_name, num2str(ctrlProcessId)));
-    simStats.tsFlowOptMeanTime = evalin(workspace_name, append(flow_opt_mean_time_name, num2str(ctrlProcessId)));
-    simStats.tsBasedControlTime = evalin(workspace_name, append('tsBasedControlTime_', num2str(ctrlProcessId)));
-    simStats.tsBasedIdentificationTime = evalin(workspace_name, append('tsBasedIdentificationTime_', num2str(ctrlProcessId)));
+    simStats.tsFirstOptTime            = get_var_from_workspace(workspace_name, ctrlProcessId, first_opt_time_name);
+    simStats.tsFlowOptMeanTime         = get_var_from_workspace(workspace_name, ctrlProcessId, flow_opt_mean_time_name);
+    simStats.tsBasedControlTime        = get_var_from_workspace(workspace_name, ctrlProcessId, 'tsBasedControlTime_');
+    simStats.tsBasedIdentificationTime = get_var_from_workspace(workspace_name, ctrlProcessId, 'tsBasedIdentificationTime_');
+    simStats.sdreMeanTime              = get_var_from_workspace(workspace_name, ctrlProcessId, sdre_mean_time_name);
 
 
     if verbose
@@ -268,4 +271,18 @@ function plotComparison(figName, lineName, kStart, timesteps, ...
     ax = gca;
     ax.FontSize = 18;
     exportgraphics(gca, fullfile(imgDir, [figName '.png']))
+end
+
+function varVal = get_var_from_workspace(workspace_name, ctrlProcessId, varName) 
+    %% Second method: do not use global vars technique 
+    var_unique_name = append(varName, num2str(ctrlProcessId)); 
+    ise = evalin( workspace_name, append('exist(''', var_unique_name, ''',''var'') == 1' ));
+    if ise
+        varVal = evalin(workspace_name, var_unique_name);
+        if isempty(varVal)
+            varVal = NaN;
+        end
+    else 
+        varVal = NaN; 
+    end
 end
